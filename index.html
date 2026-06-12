@@ -594,10 +594,14 @@ function buildCamp(x, z, size, name){
   if(name) addMapLabel(name, x, z, 22, true);
   return g;
 }
-const caesarCamp = buildCamp(300, 260, 64, "Caesar's Camp");
-buildCamp(-95, 215, 36, null);     // legionary camps between the lines
-buildCamp(210, -95, 36, null);
-buildCamp(-60, -218, 36, null);
+const campGroups = [
+  buildCamp(300, 260, 64, "Caesar's Camp"),
+  buildCamp(-95, 215, 36, null),     // legionary camps between the lines
+  buildCamp(210, -95, 36, null),
+  buildCamp(-60, -218, 36, null),
+];
+campGroups.forEach(c => c.visible = false);   // revealed during the engineering acts
+function setCampsVisible(v){ campGroups.forEach(c => c.visible = v); }
 
 /* --- Alesia oppidum: town wall + huts on the plateau --- */
 {
@@ -895,16 +899,607 @@ renderer.domElement.addEventListener('pointerup', (e) => {
 });
 
 /* =====================================================================
-   SECTION 6 : EFFECTS  (filled in build stage 3)
+   SECTION 6 : EFFECTS
+   Period-appropriate only: arrows, javelins, ballista bolts, fire,
+   dust, pulsing assault arrows. No gunpowder — it's 52 BCE.
    ===================================================================== */
+function makeGlowTexture(r, g, b){
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+  const c = cv.getContext('2d');
+  const gr = c.createRadialGradient(32, 32, 2, 32, 32, 30);
+  gr.addColorStop(0, `rgba(${r},${g},${b},1)`);
+  gr.addColorStop(0.4, `rgba(${r},${g},${b},0.55)`);
+  gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+  c.fillStyle = gr; c.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(cv);
+}
+const TEX_SOFT  = makeGlowTexture(255, 255, 255);
+const TEX_FIRE  = makeGlowTexture(255, 170, 60);
+const TEX_SMOKE = makeGlowTexture(110, 105, 100);
+
+/* ---------- arrow / javelin volleys (arcing particle streams) ---------- */
+class Volley {
+  constructor(colorHex, n = 110, size = 2.2){
+    this.n = n;
+    this.from = new THREE.Vector3(); this.to = new THREE.Vector3();
+    this.spreadF = 26; this.spreadT = 30; this.arc = 38; this.speed = 0.55;
+    this.t = new Float32Array(n);
+    this.offF = []; this.offT = [];
+    for(let i = 0; i < n; i++){
+      this.t[i] = Math.random();
+      this.offF.push([(Math.random()-0.5), (Math.random()-0.5)]);
+      this.offT.push([(Math.random()-0.5), (Math.random()-0.5)]);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+    this.points = new THREE.Points(geo, new THREE.PointsMaterial({
+      color: colorHex, size, map: TEX_SOFT, transparent: true, opacity: 0.95,
+      depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.points.visible = false;
+    this.active = false;
+    scene.add(this.points);
+    updateHooks.push((dt) => this.update(dt));
+  }
+  fireBetween(fx, fz, tx, tz){
+    this.from.set(fx, groundY(fx, fz) + 4, fz);
+    this.to.set(tx, groundY(tx, tz) + 2, tz);
+    this.active = true; this.points.visible = true;
+  }
+  stop(){ this.active = false; this.points.visible = false; }
+  update(dt){
+    if(!this.active) return;
+    const p = this.points.geometry.attributes.position;
+    for(let i = 0; i < this.n; i++){
+      this.t[i] += dt * this.speed * (0.8 + (i % 7) * 0.06);
+      if(this.t[i] > 1) this.t[i] -= 1;
+      const k = this.t[i];
+      const fx = this.from.x + this.offF[i][0] * this.spreadF;
+      const fz = this.from.z + this.offF[i][1] * this.spreadF;
+      const tx = this.to.x + this.offT[i][0] * this.spreadT;
+      const tz = this.to.z + this.offT[i][1] * this.spreadT;
+      const x = fx + (tx - fx) * k;
+      const z = fz + (tz - fz) * k;
+      const y = this.from.y + (this.to.y - this.from.y) * k + Math.sin(k * Math.PI) * this.arc;
+      p.setXYZ(i, x, y, z);
+    }
+    p.needsUpdate = true;
+  }
+}
+// volley pool, configured per act
+const volleys = {
+  sortieOut:   new Volley(0xff8a8a),   // defenders firing at the inner line
+  romeIn:      new Volley(0x9ec3ff),   // Romans answering inward
+  reliefIn:    new Volley(0x9dffb0),   // relief army firing at the outer line
+  romeOut:     new Volley(0x9ec3ff),   // Romans answering outward
+  montRea:     new Volley(0x9dffb0),   // Mont Réa flank assault
+  romeMontRea: new Volley(0x9ec3ff),
+};
+
+/* ---------- ballista bolts (fast, flat trajectories from the towers) ---------- */
+class BallistaBattery {
+  constructor(n = 10){
+    this.n = n; this.active = false;
+    this.bolts = [];
+    const g = new THREE.CylinderGeometry(0.28, 0.28, 9, 4);
+    g.rotateX(Math.PI / 2);
+    const m = new THREE.MeshBasicMaterial({ color: 0xffe2a8 });
+    for(let i = 0; i < n; i++){
+      const b = new THREE.Mesh(g, m.clone());
+      b.visible = false;
+      scene.add(b);
+      this.bolts.push({ mesh: b, t: 1 + Math.random(), from: new THREE.Vector3(), to: new THREE.Vector3() });
+    }
+    this.sources = []; this.targets = [];
+    updateHooks.push((dt) => this.update(dt));
+  }
+  configure(sources, targets){ this.sources = sources; this.targets = targets; }
+  start(){ this.active = true; }
+  stop(){ this.active = false; this.bolts.forEach(b => b.mesh.visible = false); }
+  update(dt){
+    if(!this.active || !this.sources.length) return;
+    for(const b of this.bolts){
+      b.t += dt * 0.9;
+      if(b.t >= 1){
+        b.t = -Math.random() * 1.5;           // reload pause
+        const s = this.sources[Math.floor(Math.random() * this.sources.length)];
+        const tg = this.targets[Math.floor(Math.random() * this.targets.length)];
+        b.from.set(s[0], groundY(s[0], s[1]) + 20, s[1]);
+        b.to.set(tg[0] + (Math.random()-0.5) * 40, groundY(tg[0], tg[1]) + 2, tg[1] + (Math.random()-0.5) * 40);
+      }
+      if(b.t < 0){ b.mesh.visible = false; continue; }
+      b.mesh.visible = true;
+      b.mesh.position.lerpVectors(b.from, b.to, b.t);
+      b.mesh.position.y += Math.sin(b.t * Math.PI) * 6;
+      b.mesh.lookAt(b.to);
+    }
+  }
+}
+const ballistae = new BallistaBattery(12);
+
+/* ---------- pulsing assault arrows (broadcast-graphics style) ---------- */
+function makeAssaultArrow(fx, fz, tx, tz, colorHex){
+  // tapered ribbon + head, conformed to the terrain
+  const from = new THREE.Vector2(fx, fz), to = new THREE.Vector2(tx, tz);
+  const dir = to.clone().sub(from); const len = dir.length(); dir.normalize();
+  const perp = new THREE.Vector2(-dir.y, dir.x);
+  const STEPS = 24, bodyFrac = 0.78, wBody = 7, wHead = 16;
+  const verts = [], idx = [];
+  for(let i = 0; i <= STEPS; i++){
+    const k = i / STEPS;
+    const p = from.clone().lerp(to, k * bodyFrac);
+    const w = wBody * (0.35 + 0.65 * k);
+    for(const s of [-1, 1]){
+      const vx = p.x + perp.x * w * s, vz = p.y + perp.y * w * s;
+      verts.push(vx, terrainHeight(vx, vz) + 2.2, vz);
+    }
+    if(i < STEPS){ const a = i*2; idx.push(a, a+1, a+2, a+1, a+3, a+2); }
+  }
+  // head triangle
+  const hb = from.clone().lerp(to, bodyFrac);
+  const tip = to;
+  const hl = [hb.x + perp.x * wHead, hb.y + perp.y * wHead];
+  const hr = [hb.x - perp.x * wHead, hb.y - perp.y * wHead];
+  const base = verts.length / 3;
+  verts.push(hl[0], terrainHeight(hl[0], hl[1]) + 2.2, hl[1]);
+  verts.push(hr[0], terrainHeight(hr[0], hr[1]) + 2.2, hr[1]);
+  verts.push(tip.x, terrainHeight(tip.x, tip.y) + 2.2, tip.y);
+  idx.push(base, base + 2, base + 1);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  const mat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true,
+    opacity: 0.55, side: THREE.DoubleSide, depthWrite: false });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.visible = false;
+  mesh.userData.phase = Math.random() * 6.28;
+  scene.add(mesh);
+  updateHooks.push((dt, t) => {
+    if(!mesh.visible) return;
+    mat.opacity = 0.32 + 0.3 * (0.5 + 0.5 * Math.sin(t * 3 + mesh.userData.phase));
+  });
+  return mesh;
+}
+const assaultArrows = {
+  sortieSW:  makeAssaultArrow( -40,  45, -150, 110, 0xff5555),  // sortie: city → inner line SW
+  sortieW:   makeAssaultArrow( -60, -20, -165, -45, 0xff5555),  // sortie: city → inner line W
+  reliefW:   makeAssaultArrow(-430,  30, -255,  35, 0x44e07a),  // relief: plain → outer line W
+  reliefNW:  makeAssaultArrow(-330, -225, -195, -160, 0x44e07a),// relief: Mont Réa → outer line NW
+  romCharge: makeAssaultArrow( 150, -260, -290, -255, 0x6ea8ff),// Roman cavalry flank charge
+};
+
+/* ---------- fire + smoke emitters ---------- */
+class FireEmitter {
+  constructor(x, z, scale = 1, smoke = true){
+    this.group = new THREE.Group();
+    const y = groundY(x, z);
+    this.group.position.set(x, y, z);
+    this.flames = [];
+    for(let i = 0; i < 3; i++){
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX_FIRE,
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+        opacity: 0.85 }));
+      s.scale.setScalar((6 + i * 3) * scale);
+      s.position.y = (3 + i * 2.5) * scale;
+      this.group.add(s); this.flames.push(s);
+    }
+    this.smoke = [];
+    if(smoke){
+      for(let i = 0; i < 4; i++){
+        const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX_SMOKE,
+          transparent: true, depthWrite: false, opacity: 0.3 }));
+        s.userData.k = i / 4;
+        this.group.add(s); this.smoke.push(s);
+      }
+    }
+    this.light = new THREE.PointLight(0xff9a3c, 0, 90 * scale, 1.8);
+    this.light.position.y = 8 * scale;
+    this.group.add(this.light);
+    this.scaleF = scale;
+    this.group.visible = false;
+    scene.add(this.group);
+    updateHooks.push((dt, t) => this.update(dt, t));
+  }
+  set(on){ this.group.visible = on; this.light.intensity = on ? 120 * this.scaleF : 0; }
+  update(dt, t){
+    if(!this.group.visible) return;
+    this.flames.forEach((f, i) => {
+      const n = Math.sin(t * 11 + i * 2.1) * 0.5 + Math.sin(t * 17 + i) * 0.3;
+      f.material.opacity = 0.65 + n * 0.25;
+      f.scale.setScalar((6 + i * 3) * this.scaleF * (1 + n * 0.12));
+    });
+    this.light.intensity = (110 + Math.sin(t * 13) * 30) * this.scaleF;
+    this.smoke.forEach(s => {
+      s.userData.k = (s.userData.k + dt * 0.12) % 1;
+      const k = s.userData.k;
+      s.position.set(Math.sin(k * 9) * 4 * this.scaleF, (8 + k * 55) * this.scaleF, Math.cos(k * 7) * 4);
+      s.scale.setScalar((10 + k * 30) * this.scaleF);
+      s.material.opacity = 0.34 * (1 - k);
+    });
+  }
+}
+const fires = {
+  city1: new FireEmitter(-25, 20, 1.4), city2: new FireEmitter(30, -28, 1.2),
+  city3: new FireEmitter(10, 45, 1.0),
+  lineSW: new FireEmitter(-138, 102, 0.9), lineW: new FireEmitter(-168, -20, 0.9),
+  lineNW: new FireEmitter(-205, -168, 1.1), plainCamp: new FireEmitter(-420, 60, 0.8),
+};
+function setFires(keys){
+  for(const k in fires) fires[k].set(keys.includes(k));
+}
+
+/* ---------- dust clouds at melee points ---------- */
+class DustCloud {
+  constructor(x, z, radius = 30, n = 9){
+    this.group = new THREE.Group();
+    this.group.position.set(x, groundY(x, z), z);
+    this.sprites = [];
+    for(let i = 0; i < n; i++){
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX_SMOKE,
+        color: 0xb8a888, transparent: true, depthWrite: false, opacity: 0.22 }));
+      s.userData = { a: Math.random() * 6.28, r: Math.random() * radius, sp: 0.3 + Math.random() * 0.5 };
+      s.scale.setScalar(16 + Math.random() * 18);
+      this.group.add(s); this.sprites.push(s);
+    }
+    this.group.visible = false;
+    scene.add(this.group);
+    updateHooks.push((dt, t) => {
+      if(!this.group.visible) return;
+      for(const s of this.sprites){
+        s.userData.a += dt * s.userData.sp;
+        s.position.set(Math.cos(s.userData.a) * s.userData.r, 6 + Math.sin(s.userData.a * 1.7) * 3,
+          Math.sin(s.userData.a) * s.userData.r);
+        s.material.opacity = 0.16 + 0.1 * Math.sin(t * 2 + s.userData.a);
+      }
+    });
+  }
+  set(on){ this.group.visible = on; }
+}
+const dust = {
+  sw:      new DustCloud(-145, 105, 34),
+  west:    new DustCloud(-260, 30, 44),
+  montRea: new DustCloud(-225, -185, 40),
+  plain:   new DustCloud(-350, -40, 55),
+};
+function setDust(keys){ for(const k in dust) dust[k].set(keys.includes(k)); }
+
+function stopAllEffects(){
+  Object.values(volleys).forEach(v => v.stop());
+  ballistae.stop();
+  Object.values(assaultArrows).forEach(a => a.visible = false);
+  setFires([]); setDust([]);
+}
 
 /* =====================================================================
-   SECTION 7 : TIMELINE / ACTS  (filled in build stage 3)
+   SECTION 7 : TIMELINE / ACTS
+   Each act is a deterministic state-setter (enter) + camera path +
+   timed mid-act triggers. Acts can be replayed in any order.
    ===================================================================== */
+function setBars(d, m, s, p){
+  const set = (id, v) => {
+    document.getElementById('b-' + id).style.width = v + '%';
+    document.getElementById('v-' + id).textContent = '~' + v + '%';
+  };
+  set('discipline', d); set('morale', m); set('supplies', s); set('pressure', p);
+}
+
+const ACTS = [
+{
+  id: 1, title: 'Vercingetorix Retreats to Alesia', duration: 24,
+  desc: 'Summer, 52 BCE. After his cavalry is mauled by Caesar\'s Germanic horsemen, Vercingetorix withdraws ~80,000 men (estimated) into the hilltop stronghold of Alesia. Caesar\'s ten legions arrive days later and seal the surrounding hills.',
+  event: 'Gallic cavalry defeated — Vercingetorix shelters behind the walls of Alesia',
+  camera: [ [-760, 460, 520, -300, 30, 0], [-380, 280, 380, -120, 30, 40],
+            [-60, 200, 300, 0, 45, 0], [180, 320, 320, 0, 40, 0] ],
+  enter(){
+    setMood(0x8fa8c0, 0xfff1d6, 1.6, 0.85);
+    setLineTarget(innerLine, 0); setLineTarget(outerLine, 0);
+    setCampsVisible(false);
+    stopAllEffects();
+    setDust(['plain']);
+    // Gauls stream off the plain into the oppidum
+    U.verc.placeAt(-340, -40);        U.verc.moveTo(0, 8, 11);
+    U.gaulGarrison.placeAt(-390, 10); U.gaulGarrison.moveTo(18, -16, 13);
+    U.gaulSortie.placeAt(-430, -60);  U.gaulSortie.moveTo(-22, 28, 14);
+    [U.verc, U.gaulGarrison, U.gaulSortie].forEach(u => { u.setVisible(true); u.setStatus('Retreating into Alesia'); });
+    // Romans approach from the east
+    U.caesar.placeAt(430, 330);  U.caesar.moveTo(310, 275, 13); U.caesar.setStatus('In pursuit');
+    U.legio1.placeAt(500, 180);  U.legio1.moveTo(240, 120, 14);
+    U.legio2.placeAt(520, 260);  U.legio2.moveTo(255, 215, 14);
+    U.legio3.placeAt(560, 230);  U.legio3.moveTo(300, 5, 15);
+    [U.legio1, U.legio2, U.legio3].forEach(u => { u.setVisible(true); u.setStatus('Marching on Alesia'); });
+    U.romCav.placeAt(460, 340);  U.romCav.moveTo(120, 90, 10); U.romCav.setStatus('Skirmishing');
+    [U.reliefMain, U.reliefCav, U.reliefElite].forEach(u => u.setVisible(false));
+    setBars(90, 85, 80, 10);
+  },
+  triggers: [ { at: 14, fn(){ setDust([]); } } ]
+},
+{
+  id: 2, title: 'Caesar Begins the Siege', duration: 24,
+  desc: 'Rather than storm the hill, Caesar decides to starve it. The legions begin the circumvallation: an 11-mile (≈18 km) ring of trench, rampart and palisade facing Alesia, studded with watchtowers every 80 feet.',
+  event: 'Vercingetorix\'s cavalry escapes by night to raise all of Gaul',
+  camera: [ [340, 240, 340, 0, 30, 0], [0, 220, 460, 0, 30, 0],
+            [-340, 240, 300, 0, 30, 0], [-420, 170, -60, 0, 35, 0] ],
+  enter(){
+    setMood(0x8fa8c0, 0xfff1d6, 1.6, 0.85);
+    setLineTarget(innerLine, 1); setLineTarget(outerLine, 0);
+    setCampsVisible(true);
+    stopAllEffects();
+    U.verc.moveTo(0, 8, 3); U.verc.setStatus('Besieged in Alesia');
+    U.gaulGarrison.moveTo(18, -16, 3); U.gaulGarrison.setStatus('Holding the oppidum');
+    U.gaulSortie.moveTo(-22, 28, 3); U.gaulSortie.setStatus('Watching the Roman works');
+    U.caesar.moveTo(295, 252, 6); U.caesar.setStatus('Directing the siege works');
+    U.legio1.moveTo(15, -205, 12); U.legio1.setStatus('Building the circumvallation');
+    U.legio2.moveTo(-205, 25, 12); U.legio2.setStatus('Building the circumvallation');
+    U.legio3.moveTo(30, 205, 12);  U.legio3.setStatus('Building the circumvallation');
+    U.romCav.moveTo(245, -170, 9); U.romCav.setStatus('Patrolling the perimeter');
+    [U.reliefMain, U.reliefCav, U.reliefElite].forEach(u => u.setVisible(false));
+    setBars(90, 78, 62, 35);
+  },
+  triggers: []
+},
+{
+  id: 3, title: 'Roman Engineering Works', duration: 24,
+  desc: 'Expecting a relief army, Caesar builds a second, outward-facing wall — the contravallation, ≈13 miles (21 km) around. Between and before the lines: twin trenches, a flooded ditch, sharpened stakes ("cippi"), buried spikes ("stimuli") and pit-traps ("lilia"). Four cavalry and infantry camps anchor the ring.',
+  event: '25 miles of fortification raised in about three weeks (approximate)',
+  camera: [ [-340, 80, 200, -210, 25, 60], [-300, 55, -60, -255, 25, -60],
+            [-120, 120, -340, -40, 30, -200], [260, 300, 300, 0, 20, 0] ],
+  enter(){
+    setMood(0x9db1c4, 0xffe9c4, 1.5, 0.8);
+    setLineTarget(innerLine, 1); setLineTarget(outerLine, 1);
+    setCampsVisible(true);
+    stopAllEffects();
+    U.verc.setStatus('Besieged — rationing food');
+    U.gaulGarrison.setStatus('Skirmishing against the works');
+    U.gaulSortie.setStatus('Probing the inner line');
+    U.gaulSortie.moveTo(-60, 55, 8);
+    U.caesar.setStatus('Inspecting the double line');
+    U.legio1.moveTo(-30, -228, 10); U.legio1.setStatus('Building the contravallation');
+    U.legio2.moveTo(-228, -15, 10); U.legio2.setStatus('Building the contravallation');
+    U.legio3.moveTo(60, 222, 10);   U.legio3.setStatus('Building the contravallation');
+    U.romCav.moveTo(285, -185, 6);  U.romCav.setStatus('Foraging escort duty');
+    [U.reliefMain, U.reliefCav, U.reliefElite].forEach(u => u.setVisible(false));
+    setBars(88, 70, 42, 60);
+  },
+  triggers: []
+},
+{
+  id: 4, title: 'The Gallic Relief Army Arrives', duration: 24,
+  desc: 'The tribes of Gaul answer the call. An enormous relief army — 250,000 by Caesar\'s own (likely exaggerated) count — masses on the Plain of Laumes, west of Alesia. The besiegers are now themselves besieged: Rome holds a ring squeezed from both sides.',
+  event: 'Inside the walls, food is gone — the Romans now face war on two fronts',
+  camera: [ [40, 280, 240, -150, 25, 0], [-220, 180, 280, -380, 25, 0],
+            [-600, 130, 200, -400, 30, -20], [-480, 340, -40, -240, 20, 0] ],
+  enter(){
+    setMood(0x97a4b8, 0xffe2b0, 1.45, 0.75);
+    setLineTarget(innerLine, 1); setLineTarget(outerLine, 1);
+    setCampsVisible(true);
+    stopAllEffects();
+    setDust(['plain']);
+    [U.reliefMain, U.reliefCav, U.reliefElite].forEach(u => u.setVisible(true));
+    U.reliefMain.placeAt(-650, 60);   U.reliefMain.moveTo(-420, 35, 13);
+    U.reliefCav.placeAt(-630, -110);  U.reliefCav.moveTo(-370, -85, 12);
+    U.reliefElite.placeAt(-680, -200);U.reliefElite.moveTo(-450, -170, 14);
+    U.reliefMain.setStatus('Deploying on the Plain of Laumes');
+    U.reliefCav.setStatus('Skirmishing on the plain');
+    U.reliefElite.setStatus('Scouting the Roman line');
+    U.verc.setStatus('Waiting for the signal');
+    U.gaulGarrison.setStatus('Starving — but hopeful');
+    U.gaulSortie.moveTo(-45, 40, 6); U.gaulSortie.setStatus('Massing at the gates');
+    U.legio2.moveTo(-228, -15, 4); U.legio2.setStatus('Bracing for the assault');
+    U.legio1.moveTo(-30, -228, 4); U.legio1.setStatus('Holding the north sector');
+    U.legio3.moveTo(60, 222, 4);   U.legio3.setStatus('Holding the south sector');
+    U.romCav.moveTo(250, -200, 6); U.romCav.setStatus('Held in reserve');
+    U.caesar.setStatus('Watching from the heights');
+    setBars(85, 80, 15, 78);
+  },
+  triggers: [ { at: 13, fn(){
+      volleys.reliefIn.fireBetween(-350, -70, -278, -30);
+      volleys.romeOut.fireBetween(-272, -25, -345, -65);
+    } } ]
+},
+{
+  id: 5, title: 'The Double Assault', duration: 30,
+  desc: 'The relief army storms the outer wall on the plain while Vercingetorix hurls his warriors at the inner wall — the Romans fight back-to-back between two armies. At the climax, 60,000 picked Gauls (ancient estimate) strike the weak camp below Mont Réa. Caesar, cloak streaming, leads the reserves in person; his Germanic cavalry sweeps around the hill into the attackers\' rear.',
+  event: 'Caesar commits his last cohorts — the cavalry charge breaks the assault',
+  camera: [ [-200, 100, 240, -120, 25, 80], [-380, 70, 130, -270, 30, 30],
+            [-360, 100, -300, -220, 30, -180], [-80, 160, -360, -180, 25, -170],
+            [60, 700, 60, 0, 0, 0] ],
+  enter(){
+    setMood(0x4a4458, 0xff9a55, 1.0, 0.45);   // dusk — the final assault began late in the day
+    setLineTarget(innerLine, 1); setLineTarget(outerLine, 1);
+    setCampsVisible(true);
+    stopAllEffects();
+    // inside: the sortie strikes the inner line
+    U.gaulSortie.moveTo(-115, 88, 8); U.gaulSortie.setStatus('Assaulting the inner wall');
+    U.gaulGarrison.moveTo(-70, 55, 9); U.gaulGarrison.setStatus('Supporting the breakout');
+    U.verc.moveTo(-40, 30, 9); U.verc.setStatus('Leading the breakout attempt');
+    // outside: the relief army strikes the outer line + Mont Réa
+    U.reliefMain.moveTo(-300, 30, 9);   U.reliefMain.setStatus('Storming the outer wall');
+    U.reliefCav.moveTo(-310, -75, 8);   U.reliefCav.setStatus('Charging the palisade');
+    U.reliefElite.moveTo(-240, -185, 9);U.reliefElite.setStatus('Assaulting Mont Réa camp');
+    // Romans: trapped between, then the counterstroke
+    U.legio2.setStatus('Fighting on two fronts');
+    U.legio1.moveTo(-150, -195, 8); U.legio1.setStatus('Reinforcing Mont Réa');
+    U.legio3.moveTo(-40, 215, 6);   U.legio3.setStatus('Holding the south sector');
+    U.caesar.moveTo(-120, -240, 16); U.caesar.setStatus('Leading the reserves in person');
+    U.romCav.placeAt(160, -270);
+    setBars(72, 65, 5, 96);
+    // missile exchanges on every front
+    volleys.sortieOut.fireBetween(-100, 80, -152, 108);
+    volleys.romeIn.fireBetween(-160, 112, -102, 78);
+    volleys.reliefIn.fireBetween(-315, 35, -255, 30);
+    volleys.romeOut.fireBetween(-250, 28, -318, 38);
+    volleys.montRea.fireBetween(-242, -192, -188, -156);
+    volleys.romeMontRea.fireBetween(-184, -152, -245, -195);
+    ballistae.configure(
+      [[-263, 30], [-198, -163], [-148, 105]],
+      [[-330, 40], [-255, -210], [-100, 75]]);
+    ballistae.start();
+    assaultArrows.sortieSW.visible = true;
+    assaultArrows.sortieW.visible = true;
+    assaultArrows.reliefW.visible = true;
+    assaultArrows.reliefNW.visible = true;
+    setFires(['lineSW', 'lineW', 'lineNW', 'plainCamp', 'city3']);
+    setDust(['sw', 'west', 'montRea']);
+  },
+  triggers: [
+    { at: 16, fn(){
+        document.getElementById('act-event').textContent =
+          'The Germanic cavalry rides around Mont Réa into the Gallic rear';
+        assaultArrows.romCharge.visible = true;
+        U.romCav.moveTo(-300, -260, 11); U.romCav.setStatus('Flank charge!');
+      } },
+    { at: 24, fn(){
+        volleys.montRea.stop(); volleys.reliefIn.stop();
+        U.reliefElite.moveTo(-330, -280, 7); U.reliefElite.setStatus('Routed');
+        U.reliefMain.moveTo(-380, 40, 8); U.reliefMain.setStatus('Falling back');
+      } }
+  ]
+},
+{
+  id: 6, title: 'Collapse and Surrender', duration: 26,
+  desc: 'The assault on Mont Réa collapses; the relief army melts away overnight. Inside Alesia there is nothing left to eat and no hope left to wait for. Vercingetorix rides out alone, circles Caesar\'s tribunal, and lays down his arms. The Gallic revolt is broken — Gaul becomes Roman.',
+  event: 'Vercingetorix surrenders — the war for Gaul is decided at Alesia',
+  camera: [ [-260, 220, -200, -300, 30, -250], [-60, 180, 280, 0, 40, 0],
+            [180, 100, 290, 290, 20, 250], [380, 160, 380, 300, 15, 260],
+            [0, 850, 250, 0, 0, 0] ],
+  enter(){
+    setMood(0xb8c4d4, 0xfff7e0, 1.5, 0.9);   // grey morning after
+    setLineTarget(innerLine, 1); setLineTarget(outerLine, 1);
+    setCampsVisible(true);
+    stopAllEffects();
+    setFires(['city1']);                      // smoke still rising from the town
+    setDust(['plain']);
+    // the relief army scatters
+    U.reliefMain.moveTo(-620, 80, 12);   U.reliefMain.setStatus('Dispersing — the coalition breaks');
+    U.reliefCav.moveTo(-640, -120, 11);  U.reliefCav.setStatus('Fleeing west');
+    U.reliefElite.moveTo(-600, -260, 12);U.reliefElite.setStatus('Routed');
+    // defenders withdraw into the town
+    U.gaulSortie.moveTo(-10, 35, 8);  U.gaulSortie.setStatus('Laying down arms');
+    U.gaulGarrison.moveTo(20, -12, 8); U.gaulGarrison.setStatus('Surrendering');
+    // Vercingetorix rides to Caesar's camp
+    U.verc.moveTo(0, 8, 4); U.verc.setStatus('Riding out to surrender');
+    // Romans stand down
+    U.legio1.moveTo(-30, -228, 8); U.legio1.setStatus('Standing down');
+    U.legio2.moveTo(-228, -15, 8); U.legio2.setStatus('Standing down');
+    U.legio3.moveTo(60, 222, 8);   U.legio3.setStatus('Standing down');
+    U.romCav.moveTo(250, -210, 9); U.romCav.setStatus('Pursuing stragglers');
+    U.caesar.moveTo(295, 252, 10); U.caesar.setStatus('Receiving the surrender');
+    setBars(88, 8, 2, 100);
+  },
+  triggers: [
+    { at: 8, fn(){ U.verc.moveTo(270, 235, 14); } },
+    { at: 22, fn(){ U.verc.setStatus('Prisoner of Rome'); setDust([]); } }
+  ]
+}];
 
 /* =====================================================================
-   SECTION 8 : UI WIRING  (filled in build stage 3)
+   SECTION 8 : UI WIRING, CAMERA DIRECTOR & PLAYBACK
    ===================================================================== */
+let actIndex = -1;
+let actT = 0;
+let autoPlay = true;
+let camMode = 'cinematic';
+let firedTriggers = new Set();
+let camCurvePos = null, camCurveLook = null, camPathDur = 1;
+
+const elActLabel = document.getElementById('act-label');
+const elActTitle = document.getElementById('act-title');
+const elActDesc  = document.getElementById('act-desc');
+const elActEvent = document.getElementById('act-event');
+const elProgress = document.getElementById('act-progress-fill');
+
+/* timeline buttons */
+const tl = document.getElementById('timeline');
+ACTS.forEach((act, i) => {
+  const b = document.createElement('button');
+  b.className = 'act-btn';
+  b.innerHTML = `<span class="num">ACT ${act.id}</span>${act.title}`;
+  b.addEventListener('click', () => { setAct(i); });
+  tl.appendChild(b);
+});
+
+function buildCameraPath(act){
+  const ps = [], ls = [];
+  for(const k of act.camera){
+    ps.push(new THREE.Vector3(k[0], k[1], k[2]));
+    ls.push(new THREE.Vector3(k[3], k[4], k[5]));
+  }
+  camCurvePos = ps.length > 1 ? new THREE.CatmullRomCurve3(ps, false, 'centripetal', 0.6) : { getPoint: () => ps[0] };
+  camCurveLook = ls.length > 1 ? new THREE.CatmullRomCurve3(ls, false, 'centripetal', 0.6) : { getPoint: () => ls[0] };
+  camPathDur = act.duration * 0.92;
+}
+
+function setAct(i){
+  actIndex = ((i % ACTS.length) + ACTS.length) % ACTS.length;
+  const act = ACTS[actIndex];
+  actT = 0;
+  firedTriggers = new Set();
+  act.enter();
+  buildCameraPath(act);
+  elActLabel.textContent = 'ACT ' + act.id + ' OF ' + ACTS.length;
+  elActTitle.textContent = act.title;
+  elActDesc.textContent = act.desc;
+  elActEvent.textContent = act.event;
+  document.querySelectorAll('.act-btn').forEach((b, j) => b.classList.toggle('active', j === actIndex));
+  infoCard.classList.remove('visible');
+}
+
+/* transport buttons */
+const btnPlay = document.getElementById('btn-play');
+const btnCam  = document.getElementById('btn-camera');
+function setAutoPlay(v){
+  autoPlay = v;
+  btnPlay.textContent = v ? '⏸ Pause' : '▶ Auto Play';
+  btnPlay.classList.toggle('toggled', v);
+}
+function setCamMode(m){
+  camMode = m;
+  const cine = m === 'cinematic';
+  btnCam.textContent = cine ? '🎬 Cinematic Camera' : '🕹 Free Camera';
+  btnCam.classList.toggle('toggled', cine);
+  document.body.classList.toggle('cinematic', cine);
+  controls.enabled = !cine;
+}
+btnPlay.addEventListener('click', () => setAutoPlay(!autoPlay));
+btnCam.addEventListener('click', () => setCamMode(camMode === 'cinematic' ? 'free' : 'cinematic'));
+document.getElementById('btn-prev').addEventListener('click', () => setAct(actIndex - 1));
+document.getElementById('btn-next').addEventListener('click', () => setAct(actIndex + 1));
+addEventListener('keydown', (e) => {
+  if(e.key === ' '){ e.preventDefault(); setAutoPlay(!autoPlay); }
+  if(e.key === 'ArrowRight') setAct(actIndex + 1);
+  if(e.key === 'ArrowLeft') setAct(actIndex - 1);
+  if(e.key.toLowerCase() === 'c') setCamMode(camMode === 'cinematic' ? 'free' : 'cinematic');
+});
+
+/* playback + camera director */
+const camPosNow = new THREE.Vector3();
+const camLookNow = new THREE.Vector3(0, 30, 0);
+updateHooks.push((dt) => {
+  if(actIndex < 0) return;
+  const act = ACTS[actIndex];
+  if(autoPlay || actT < camPathDur) actT += dt;
+  // mid-act triggers
+  for(let k = 0; k < (act.triggers?.length ?? 0); k++){
+    const tr = act.triggers[k];
+    if(actT >= tr.at && !firedTriggers.has(k)){ firedTriggers.add(k); tr.fn(); }
+  }
+  elProgress.style.width = Math.min(100, actT / act.duration * 100) + '%';
+  if(autoPlay && actT >= act.duration) setAct(actIndex + 1);
+  // cinematic camera
+  if(camMode === 'cinematic'){
+    const k = Math.min(1, actT / camPathDur);  // catmull-rom supplies the smoothing
+    camPosNow.copy(camCurvePos.getPoint(k));
+    camLookNow.lerp(camCurveLook.getPoint(k), Math.min(1, dt * 5));
+    camera.position.lerp(camPosNow, Math.min(1, dt * 2.2));
+    camera.lookAt(camLookNow);
+    controls.target.copy(camLookNow);   // seamless hand-off to free camera
+  }
+});
+
+/* boot: start the show */
+setCamMode('cinematic');
+setAutoPlay(true);
+setAct(0);
 
 /* =====================================================================
    SECTION 9 : MAIN LOOP
