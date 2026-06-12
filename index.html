@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Battle of Alesia — 52 BCE | Interactive 3D Battle Documentary</title>
+<style>
+  /* ==================== UI : GLOBAL ==================== */
+  :root{
+    --rome:#3b82f6; --rome-dark:#1d4ed8;
+    --verc:#ef4444; --verc-dark:#b91c1c;
+    --relief:#22c55e; --relief-dark:#15803d;
+    --panel:rgba(12,14,20,0.82);
+    --panel-border:rgba(255,255,255,0.14);
+    --gold:#d8b25c;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:100%;height:100%;overflow:hidden;background:#0a0c10;
+    font-family:"Segoe UI",Helvetica,Arial,sans-serif;color:#e8e6e0;}
+  #scene-container{position:fixed;inset:0;}
+  canvas{display:block;}
+
+  /* cinematic letterbox + vignette */
+  .letterbox{position:fixed;left:0;right:0;height:0;background:#000;z-index:5;
+    transition:height 1.2s ease;pointer-events:none;}
+  #letterbox-top{top:0;} #letterbox-bottom{bottom:0;}
+  body.cinematic #letterbox-top{height:46px;} body.cinematic #letterbox-bottom{height:46px;}
+  #vignette{position:fixed;inset:0;pointer-events:none;z-index:4;
+    background:radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.45) 100%);}
+
+  /* ==================== UI : TITLE ==================== */
+  #title-block{position:fixed;top:18px;left:22px;z-index:10;max-width:420px;
+    text-shadow:0 2px 8px rgba(0,0,0,0.9);pointer-events:none;}
+  #title-block h1{font-family:Georgia,"Times New Roman",serif;font-size:26px;
+    letter-spacing:3px;color:var(--gold);text-transform:uppercase;}
+  #title-block h2{font-size:13px;font-weight:400;letter-spacing:2px;color:#cfc9bb;margin-top:2px;}
+  #title-block p{font-size:11.5px;color:#b8b2a4;margin-top:6px;line-height:1.45;}
+
+  /* ==================== UI : LEGEND ==================== */
+  #legend{position:fixed;top:18px;right:22px;z-index:10;background:var(--panel);
+    border:1px solid var(--panel-border);border-radius:8px;padding:10px 14px;
+    font-size:11.5px;backdrop-filter:blur(6px);min-width:215px;}
+  #legend h3{font-size:11px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;
+    margin-bottom:7px;border-bottom:1px solid var(--panel-border);padding-bottom:5px;}
+  .legend-row{display:flex;align-items:center;gap:8px;margin:4px 0;}
+  .swatch{width:13px;height:13px;border-radius:3px;flex:0 0 auto;box-shadow:0 0 6px rgba(0,0,0,0.5);}
+  .line-swatch{width:22px;height:0;border-top:3px solid;flex:0 0 auto;}
+  .dashed{border-top-style:dashed !important;}
+
+  /* ==================== UI : ACT PANEL ==================== */
+  #act-panel{position:fixed;left:22px;bottom:118px;z-index:10;max-width:430px;
+    background:var(--panel);border:1px solid var(--panel-border);border-left:3px solid var(--gold);
+    border-radius:8px;padding:13px 16px;backdrop-filter:blur(6px);
+    transition:opacity .5s;}
+  #act-label{font-size:10.5px;letter-spacing:2.5px;color:var(--gold);text-transform:uppercase;}
+  #act-title{font-family:Georgia,serif;font-size:18px;margin:3px 0 6px;}
+  #act-desc{font-size:12px;line-height:1.5;color:#cfc9bd;}
+  #act-event{font-size:11px;margin-top:8px;color:#ffd9a0;min-height:14px;}
+  #act-event::before{content:"⚑ ";}
+  #act-event:empty{display:none;}
+
+  /* ==================== UI : STATUS BARS ==================== */
+  #status-panel{position:fixed;right:22px;bottom:118px;z-index:10;width:225px;
+    background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;
+    padding:11px 14px;backdrop-filter:blur(6px);font-size:11px;}
+  #status-panel h3{font-size:10.5px;letter-spacing:2px;color:var(--gold);
+    text-transform:uppercase;margin-bottom:8px;}
+  .bar-row{margin:7px 0;}
+  .bar-row label{display:flex;justify-content:space-between;margin-bottom:3px;color:#cfc9bd;}
+  .bar-track{height:7px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;}
+  .bar-fill{height:100%;border-radius:4px;transition:width 1.4s ease;}
+  #status-note{font-size:9.5px;color:#8d887c;margin-top:8px;font-style:italic;}
+
+  /* ==================== UI : TIMELINE & CONTROLS ==================== */
+  #control-deck{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:11;
+    background:var(--panel);border:1px solid var(--panel-border);border-radius:12px;
+    padding:10px 16px;backdrop-filter:blur(8px);width:min(880px,94vw);}
+  #timeline{display:flex;gap:5px;margin-bottom:9px;}
+  .act-btn{flex:1;background:rgba(255,255,255,0.06);border:1px solid var(--panel-border);
+    color:#bdb7aa;font-size:10.5px;padding:7px 4px;border-radius:6px;cursor:pointer;
+    text-align:center;transition:all .25s;line-height:1.3;}
+  .act-btn .num{display:block;font-size:9px;letter-spacing:1.5px;color:#8d887c;}
+  .act-btn:hover{background:rgba(255,255,255,0.14);color:#fff;}
+  .act-btn.active{background:rgba(216,178,92,0.22);border-color:var(--gold);color:#ffe9bb;}
+  .act-btn.active .num{color:var(--gold);}
+  #transport{display:flex;align-items:center;gap:8px;justify-content:center;}
+  .ctl-btn{background:rgba(255,255,255,0.08);border:1px solid var(--panel-border);
+    color:#e8e6e0;font-size:12px;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all .2s;}
+  .ctl-btn:hover{background:rgba(255,255,255,0.18);}
+  .ctl-btn.toggled{background:rgba(216,178,92,0.25);border-color:var(--gold);color:#ffe9bb;}
+  #act-progress{flex:1;height:5px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;max-width:240px;}
+  #act-progress-fill{height:100%;width:0%;background:var(--gold);transition:width .3s linear;}
+
+  /* ==================== UI : INFO CARD ==================== */
+  #info-card{position:fixed;z-index:20;width:265px;background:rgba(10,12,18,0.94);
+    border:1px solid var(--gold);border-radius:9px;padding:13px 15px;display:none;
+    box-shadow:0 8px 30px rgba(0,0,0,0.7);font-size:12px;backdrop-filter:blur(8px);}
+  #info-card.visible{display:block;}
+  #info-card h3{font-family:Georgia,serif;font-size:16px;margin-bottom:2px;}
+  #info-card .faction-tag{display:inline-block;font-size:9.5px;letter-spacing:1.5px;
+    text-transform:uppercase;padding:2px 7px;border-radius:4px;margin:4px 0 7px;}
+  #info-card p{line-height:1.45;color:#cfc9bd;}
+  #info-card .stat{display:flex;justify-content:space-between;margin:3px 0;color:#bdb7aa;font-size:11px;}
+  #info-card .close-x{position:absolute;top:7px;right:11px;cursor:pointer;color:#8d887c;font-size:14px;}
+  #info-card .close-x:hover{color:#fff;}
+
+  /* ==================== 3D LABELS (CSS2D) ==================== */
+  .map-label{font-size:11px;letter-spacing:1.5px;color:#f0ead9;text-transform:uppercase;
+    text-shadow:0 1px 4px #000,0 0 10px rgba(0,0,0,0.9);pointer-events:none;white-space:nowrap;
+    font-family:Georgia,serif;}
+  .map-label.minor{font-size:9.5px;color:#cdc6b4;letter-spacing:1px;}
+  .unit-label{font-size:10px;padding:2px 8px;border-radius:4px;white-space:nowrap;cursor:pointer;
+    pointer-events:auto;background:rgba(8,10,14,0.78);border:1px solid;letter-spacing:0.5px;
+    text-shadow:0 1px 2px #000;transition:transform .15s;}
+  .unit-label:hover{transform:scale(1.12);}
+  .unit-label.rome{border-color:var(--rome);color:#bcd6ff;}
+  .unit-label.verc{border-color:var(--verc);color:#ffc4c4;}
+  .unit-label.relief{border-color:var(--relief);color:#bff5cd;}
+
+  /* loading screen */
+  #loader{position:fixed;inset:0;background:#0a0c10;z-index:100;display:flex;
+    flex-direction:column;align-items:center;justify-content:center;gap:14px;
+    transition:opacity .8s;}
+  #loader.done{opacity:0;pointer-events:none;}
+  #loader h1{font-family:Georgia,serif;letter-spacing:4px;color:var(--gold);font-size:30px;}
+  #loader p{color:#8d887c;font-size:12px;letter-spacing:2px;}
+
+  /* responsive */
+  @media (max-width:900px){
+    #title-block{max-width:300px;} #title-block h1{font-size:19px;}
+    #title-block p{display:none;}
+    #legend{display:none;}
+    #act-panel{max-width:300px;bottom:132px;}
+    #status-panel{display:none;}
+    .act-btn{font-size:9px;}
+  }
+</style>
+</head>
+<body>
+
+<div id="scene-container"></div>
+<div id="vignette"></div>
+<div class="letterbox" id="letterbox-top"></div>
+<div class="letterbox" id="letterbox-bottom"></div>
+
+<!-- ==================== LOADING ==================== -->
+<div id="loader">
+  <h1>ALESIA</h1>
+  <p>52 BCE &mdash; RECONSTRUCTING THE BATTLEFIELD&hellip;</p>
+</div>
+
+<!-- ==================== TITLE ==================== -->
+<div id="title-block">
+  <h1>The Battle of Alesia</h1>
+  <h2>52 BCE &mdash; GAUL &mdash; CAESAR vs. VERCINGETORIX</h2>
+  <p>Julius Caesar besieges the Gallic stronghold of Alesia — then is himself surrounded
+     when a massive Gallic relief army arrives. The Romans must fight on two fronts at once,
+     trapped between two enemy forces inside their own double ring of fortifications.</p>
+</div>
+
+<!-- ==================== LEGEND ==================== -->
+<div id="legend">
+  <h3>Forces &amp; Lines</h3>
+  <div class="legend-row"><span class="swatch" style="background:var(--rome)"></span>Roman Army — Julius Caesar</div>
+  <div class="legend-row"><span class="swatch" style="background:var(--verc)"></span>Gallic Defenders — Vercingetorix</div>
+  <div class="legend-row"><span class="swatch" style="background:var(--relief)"></span>Gallic Relief Army</div>
+  <div class="legend-row"><span class="line-swatch" style="border-color:var(--rome)"></span>Inner Siege Line (Circumvallation)</div>
+  <div class="legend-row"><span class="line-swatch dashed" style="border-color:#7fb0ff"></span>Outer Defense Line (Contravallation)</div>
+</div>
+
+<!-- ==================== ACT PANEL ==================== -->
+<div id="act-panel">
+  <div id="act-label">Prologue</div>
+  <div id="act-title">The Road to Alesia</div>
+  <div id="act-desc">After defeat at Gergovia, Caesar pursues Vercingetorix across Gaul.
+    The Gallic leader withdraws his army into the hilltop stronghold of Alesia.</div>
+  <div id="act-event"></div>
+</div>
+
+<!-- ==================== STATUS BARS ==================== -->
+<div id="status-panel">
+  <h3>Battle Status</h3>
+  <div class="bar-row"><label><span>Roman Discipline</span><span id="v-discipline"></span></label>
+    <div class="bar-track"><div class="bar-fill" id="b-discipline" style="background:var(--rome);width:90%"></div></div></div>
+  <div class="bar-row"><label><span>Gallic Morale</span><span id="v-morale"></span></label>
+    <div class="bar-track"><div class="bar-fill" id="b-morale" style="background:var(--verc);width:85%"></div></div></div>
+  <div class="bar-row"><label><span>Alesia Supplies</span><span id="v-supplies"></span></label>
+    <div class="bar-track"><div class="bar-fill" id="b-supplies" style="background:#e2a23b;width:80%"></div></div></div>
+  <div class="bar-row"><label><span>Siege Pressure</span><span id="v-pressure"></span></label>
+    <div class="bar-track"><div class="bar-fill" id="b-pressure" style="background:#9f6bff;width:10%"></div></div></div>
+  <div id="status-note">All figures approximate / estimated from ancient sources.</div>
+</div>
+
+<!-- ==================== TIMELINE / CONTROLS ==================== -->
+<div id="control-deck">
+  <div id="timeline"></div>
+  <div id="transport">
+    <button class="ctl-btn" id="btn-prev" title="Previous act">⏮ Prev</button>
+    <button class="ctl-btn" id="btn-play" title="Auto play">▶ Auto Play</button>
+    <button class="ctl-btn" id="btn-next" title="Next act">Next ⏭</button>
+    <div id="act-progress"><div id="act-progress-fill"></div></div>
+    <button class="ctl-btn toggled" id="btn-camera" title="Toggle camera mode">🎬 Cinematic Camera</button>
+  </div>
+</div>
+
+<!-- ==================== INFO CARD ==================== -->
+<div id="info-card">
+  <span class="close-x" id="info-close">✕</span>
+  <h3 id="ic-name"></h3>
+  <span class="faction-tag" id="ic-faction"></span>
+  <div class="stat"><span>Role</span><span id="ic-role"></span></div>
+  <div class="stat"><span>Strength</span><span id="ic-strength"></span></div>
+  <div class="stat"><span>Status</span><span id="ic-status"></span></div>
+  <p id="ic-desc" style="margin-top:7px"></p>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+/* =====================================================================
+   SECTION 1 : SCENE SETUP
+   ===================================================================== */
+const container = document.getElementById('scene-container');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x8fa8c0);
+scene.fog = new THREE.Fog(0x8fa8c0, 700, 1900);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 1, 5000);
+camera.position.set(0, 900, 750);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+container.appendChild(renderer.domElement);
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(innerWidth, innerHeight);
+labelRenderer.domElement.style.position = 'fixed';
+labelRenderer.domElement.style.top = '0';
+labelRenderer.domElement.style.pointerEvents = 'none';
+labelRenderer.domElement.style.zIndex = '3';
+document.body.appendChild(labelRenderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 20, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.maxPolarAngle = Math.PI * 0.49;
+controls.minDistance = 60;
+controls.maxDistance = 1600;
+
+/* --- lighting (afternoon documentary light; shifts at dusk in Act 5) --- */
+const hemi = new THREE.HemisphereLight(0xcfe4ff, 0x4a3f2e, 0.85);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff1d6, 1.6);
+sun.position.set(-420, 600, 260);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -550; sun.shadow.camera.right = 550;
+sun.shadow.camera.top = 550;  sun.shadow.camera.bottom = -550;
+sun.shadow.camera.far = 1800;
+sun.shadow.bias = -0.0004;
+scene.add(sun);
+
+const lighting = {              // lerp targets used by the act system
+  sky: new THREE.Color(0x8fa8c0), sunColor: new THREE.Color(0xfff1d6),
+  sunIntensity: 1.6, hemiIntensity: 0.85,
+  targetSky: new THREE.Color(0x8fa8c0), targetSunColor: new THREE.Color(0xfff1d6),
+  targetSunIntensity: 1.6, targetHemiIntensity: 0.85
+};
+function setMood(skyHex, sunHex, sunI, hemiI){
+  lighting.targetSky.set(skyHex); lighting.targetSunColor.set(sunHex);
+  lighting.targetSunIntensity = sunI; lighting.targetHemiIntensity = hemiI;
+}
+
+const updateHooks = [];   // every dynamic system registers an update(dt, t) here
+const clock = new THREE.Clock();
+
+/* =====================================================================
+   SECTION 2 : TERRAIN
+   Central plateau = Alesia oppidum. Two river valleys flank it
+   (the Ose & Oserain). Surrounding hills incl. Mont Réa to the NW,
+   open western plain (Plain of Laumes) where the relief army deploys.
+   ===================================================================== */
+const WORLD = 1300;          // terrain size
+const PLATEAU_R = 95;        // Alesia plateau radius
+const PLATEAU_H = 46;        // plateau height
+const INNER_R = 175;         // inner siege line radius (circumvallation)
+const OUTER_R = 265;         // outer defense line radius (contravallation)
+
+function smoothstep(a, b, x){ x = Math.min(1, Math.max(0, (x-a)/(b-a))); return x*x*(3-2*x); }
+
+const hillDefs = [
+  { x:-330, z:-235, r:120, h:34 },   // Mont Réa (NW) — site of the final assault
+  { x: 320, z:-250, r:130, h:30 },   // NE heights
+  { x: 300, z: 260, r:120, h:28 },   // SE heights — Caesar's command camp
+  { x:-300, z: 290, r:110, h:24 },   // SW heights
+  { x:  30, z:-480, r:200, h:38 },   // far northern rim
+  { x: 100, z: 500, r:220, h:36 },   // far southern rim
+  { x: 520, z:  20, r:200, h:40 },   // eastern rim
+];
+
+function riverDepth(x, z){
+  // two rivers flowing roughly E-W, curving around the plateau
+  let d = 0;
+  const r1 = z + 128 + Math.sin(x * 0.004) * 26;   // north river (Ose)
+  const r2 = z - 128 - Math.sin(x * 0.005 + 1.5) * 24; // south river (Oserain)
+  d += 9 * Math.exp(-(r1*r1) / (2*15*15));
+  d += 9 * Math.exp(-(r2*r2) / (2*15*15));
+  return d;
+}
+
+function terrainHeight(x, z){
+  let h = 2.5 * Math.sin(x*0.011) * Math.cos(z*0.013)
+        + 1.4 * Math.sin(x*0.031 + 2) * Math.cos(z*0.027 + 1);
+  const dC = Math.hypot(x, z);
+  // flat-topped central plateau with steep flanks
+  h += PLATEAU_H * (1 - smoothstep(PLATEAU_R*0.72, PLATEAU_R*1.45, dC));
+  for(const hd of hillDefs){
+    const d = Math.hypot(x-hd.x, z-hd.z);
+    h += hd.h * Math.exp(-(d*d)/(2*hd.r*hd.r*0.42));
+  }
+  // keep the western plain (Plain of Laumes) open & flat for the relief army
+  const plain = smoothstep(-180, -420, x) * (1 - smoothstep(120, 260, Math.abs(z)));
+  h *= (1 - plain*0.75);
+  h -= riverDepth(x, z); // carve the two river valleys
+  return h;
+}
+
+const terrainGeo = new THREE.PlaneGeometry(WORLD, WORLD, 240, 240);
+terrainGeo.rotateX(-Math.PI/2);
+{
+  const pos = terrainGeo.attributes.position;
+  const colors = [];
+  const cGrass  = new THREE.Color(0x6f8c4f);
+  const cGrass2 = new THREE.Color(0x86a05e);
+  const cSlope  = new THREE.Color(0x8a7a55);
+  const cRock   = new THREE.Color(0xa39376);
+  const cValley = new THREE.Color(0x5d7d49);
+  for(let i=0;i<pos.count;i++){
+    const x = pos.getX(i), z = pos.getZ(i);
+    const h = terrainHeight(x, z);
+    pos.setY(i, h);
+    const c = new THREE.Color();
+    const n = Math.sin(x*0.05)*Math.cos(z*0.07)*0.5+0.5; // patchiness
+    if(h < 1.2) c.copy(cValley);
+    else if(h < 14) c.lerpColors(cGrass, cGrass2, n);
+    else if(h < 30) c.lerpColors(cGrass2, cSlope, smoothstep(14,30,h));
+    else c.lerpColors(cSlope, cRock, smoothstep(30,52,h));
+    // dusty paleness on the western plain
+    if(x < -180 && Math.abs(z) < 240) c.lerp(new THREE.Color(0x9aa06a), 0.25);
+    colors.push(c.r, c.g, c.b);
+  }
+  terrainGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  terrainGeo.computeVertexNormals();
+}
+const terrain = new THREE.Mesh(terrainGeo,
+  new THREE.MeshStandardMaterial({ vertexColors:true, roughness:0.95, metalness:0 }));
+terrain.receiveShadow = true;
+scene.add(terrain);
+
+/* helper: place an object on the terrain surface */
+function groundY(x, z){ return terrainHeight(x, z); }
+
+/* --- rivers (water ribbons) --- */
+function makeRiver(zBase, phase, freq){
+  const pts = [];
+  for(let x = -WORLD/2; x <= WORLD/2; x += 26){
+    const z = zBase + Math.sin(x*freq + phase) * (zBase<0?26:24) * (zBase<0?1:-1) * -1;
+    pts.push(new THREE.Vector3(x, 0, z));
+  }
+  const curve = new THREE.CatmullRomCurve3(pts);
+  const geo = new THREE.PlaneGeometry(WORLD, 18, 120, 1);
+  geo.rotateX(-Math.PI/2);
+  const p = geo.attributes.position;
+  for(let i=0;i<p.count;i++){
+    const t = (p.getX(i)+WORLD/2)/WORLD;
+    const c = curve.getPoint(t);
+    const off = p.getZ(i);
+    p.setX(i, c.x); p.setZ(i, c.z + off);
+    p.setY(i, Math.max(terrainHeight(c.x, c.z + off) + 0.4, -2));
+  }
+  geo.computeVertexNormals();
+  const mat = new THREE.MeshStandardMaterial({ color:0x3f6f96, roughness:0.25, metalness:0.35,
+    transparent:true, opacity:0.88 });
+  const m = new THREE.Mesh(geo, mat);
+  scene.add(m);
+  return m;
+}
+makeRiver(-128, 0, 0.004);
+makeRiver(128, 1.5, 0.005);
+
+/* --- scattered trees on hills (instanced, cheap) --- */
+{
+  const trunkG = new THREE.CylinderGeometry(0.5, 0.7, 4, 5);
+  const crownG = new THREE.ConeGeometry(3.2, 8, 6);
+  const trunkM = new THREE.MeshStandardMaterial({ color:0x5d4a33, roughness:1 });
+  const crownM = new THREE.MeshStandardMaterial({ color:0x3f5d33, roughness:1 });
+  const N = 420;
+  const trunks = new THREE.InstancedMesh(trunkG, trunkM, N);
+  const crowns = new THREE.InstancedMesh(crownG, crownM, N);
+  const dummy = new THREE.Object3D();
+  let placed = 0, guard = 0;
+  // deterministic pseudo-random so the layout is stable
+  let seed = 7; const rnd = () => (seed = (seed*16807)%2147483647) / 2147483647;
+  while(placed < N && guard++ < 6000){
+    const x = (rnd()-0.5)*WORLD*0.92, z = (rnd()-0.5)*WORLD*0.92;
+    const h = terrainHeight(x, z);
+    const dC = Math.hypot(x, z);
+    if(h < 6 || h > 44) continue;                 // not in rivers / not on bare rock
+    if(dC > PLATEAU_R*1.1 && dC < OUTER_R + 40) continue; // keep siege zone clear
+    if(x < -160 && Math.abs(z) < 250) continue;   // keep western plain clear
+    const s = 0.7 + rnd()*0.9;
+    dummy.position.set(x, h+2*s, z); dummy.scale.setScalar(s); dummy.rotation.y = rnd()*6.28;
+    dummy.updateMatrix(); trunks.setMatrixAt(placed, dummy.matrix);
+    dummy.position.y = h + (4 + 4)*s*0.9; dummy.updateMatrix();
+    crowns.setMatrixAt(placed, dummy.matrix);
+    placed++;
+  }
+  trunks.count = crowns.count = placed;
+  trunks.castShadow = crowns.castShadow = true;
+  scene.add(trunks, crowns);
+}
+
+/* =====================================================================
+   SECTION 3 : MAP LABELS
+   ===================================================================== */
+function addMapLabel(text, x, z, yOff = 8, minor = false){
+  const div = document.createElement('div');
+  div.className = 'map-label' + (minor ? ' minor' : '');
+  div.textContent = text;
+  const obj = new CSS2DObject(div);
+  obj.position.set(x, groundY(x, z) + yOff, z);
+  scene.add(obj);
+  return obj;
+}
+addMapLabel('ALESIA', 0, 0, PLATEAU_H + 26);
+addMapLabel('Mont Réa', -330, -235, 30, true);
+addMapLabel('Plain of Laumes', -380, 0, 10, true);
+addMapLabel('River Ose', -510, -118, 6, true);
+addMapLabel('River Oserain', -510, 140, 6, true);
+const lblInner = addMapLabel('Roman Inner Siege Line', INNER_R*0.07, INNER_R + 12, 14, true);
+const lblOuter = addMapLabel('Roman Outer Defense Line', OUTER_R*0.07, -(OUTER_R + 14), 14, true);
+lblInner.visible = lblOuter.visible = false;   // revealed when the lines are built
+
+/* =====================================================================
+   SECTION 4 : FORTIFICATIONS  (filled in build stage 2)
+   ===================================================================== */
+
+/* =====================================================================
+   SECTION 5 : UNITS & FLAGS  (filled in build stage 2)
+   ===================================================================== */
+
+/* =====================================================================
+   SECTION 6 : EFFECTS  (filled in build stage 3)
+   ===================================================================== */
+
+/* =====================================================================
+   SECTION 7 : TIMELINE / ACTS  (filled in build stage 3)
+   ===================================================================== */
+
+/* =====================================================================
+   SECTION 8 : UI WIRING  (filled in build stage 3)
+   ===================================================================== */
+
+/* =====================================================================
+   SECTION 9 : MAIN LOOP
+   ===================================================================== */
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+
+  // smooth lighting transitions
+  lighting.sky.lerp(lighting.targetSky, dt*1.2);
+  lighting.sunColor.lerp(lighting.targetSunColor, dt*1.2);
+  lighting.sunIntensity += (lighting.targetSunIntensity - lighting.sunIntensity)*dt*1.2;
+  lighting.hemiIntensity += (lighting.targetHemiIntensity - lighting.hemiIntensity)*dt*1.2;
+  scene.background.copy(lighting.sky);
+  scene.fog.color.copy(lighting.sky);
+  sun.color.copy(lighting.sunColor);
+  sun.intensity = lighting.sunIntensity;
+  hemi.intensity = lighting.hemiIntensity;
+
+  for(const fn of updateHooks) fn(dt, t);
+
+  controls.update();
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  labelRenderer.setSize(innerWidth, innerHeight);
+});
+
+document.getElementById('loader').classList.add('done');
+animate();
+</script>
+</body>
+</html>
