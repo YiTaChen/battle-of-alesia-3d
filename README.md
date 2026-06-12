@@ -119,7 +119,7 @@ land arc, the fleet closing the sea.
 
 **Live demo: https://yitachen.github.io/battle-of-alesia-3d/redcliffs.html**
 
-![Act 5 — the fire attack: Huang Gai's fire ships run before the east wind toward Cao Cao's chained fleet on the night Yangtze](docs/screenshot-redcliffs.png)
+![Act 6 — fire walks the chains: the burning chained fleet lights the night Yangtze as Zhou Yu's squadrons drive in behind the fire ships](docs/screenshot-redcliffs.png)
 
 The naval battle that fixed the Three Kingdoms (`redcliffs.html`, same
 single-file / CDN approach). Cao Cao's northern armada anchors on the
@@ -142,9 +142,14 @@ enemy fleet, a false surrender, an east wind — and fire.
   its current state
 - **Chain-reaction fire attack** — fire ships run before the wind, and the
   blaze spreads outward through the linked grid; a Fire Spread bar tracks it
-- **The east wind** — a particle stream over the river, a pulsing wind chip,
-  map arrows and an Eastern Wind status bar (the altar scene is flagged as a
+- **The wind that turned** — the prevailing northwest wind blows on screen
+  through Acts 1–5 (particles, wind chip, map labels), then visibly dies and
+  TURNS hard east on the night of the attack (the altar scene is flagged as a
   *Romance of the Three Kingdoms* dramatization)
+- **Fleets that move** — Cao Cao's armada sails in from upstream, the allied
+  fleet beats up to its battle anchorage, fire ships piled with straw and oil
+  jars run before the wind, and Zhou Yu's squadrons attack through the
+  burning anchorage to drums
 - **Seven-act timeline** from the southern march to the Three Kingdoms
   aftermath, with a colour-coded victory banner (red + green allies defeat
   blue)
