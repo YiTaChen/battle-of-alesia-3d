@@ -3,13 +3,13 @@
 Three single-file Three.js battle reconstructions, styled as TV history
 specials. No build step — each battle is one HTML file with CDN imports.
 
-**🏛 Main menu (start here): https://yitachen.github.io/battle-of-alesia-3d/**
+**🏛 Main menu (start here): https://yitachen.github.io/3d-battle-documentaries/**
 
 | Battle | Live demo |
 |---|---|
-| ⚔ The Battle of Alesia — 52 BCE | https://yitachen.github.io/battle-of-alesia-3d/alesia.html |
-| 🔥🌊 The Battle of Red Cliffs — 208 CE | https://yitachen.github.io/battle-of-alesia-3d/redcliffs.html |
-| 🇺🇸⚜ The Siege of Yorktown — 1781 | https://yitachen.github.io/battle-of-alesia-3d/yorktown.html |
+| ⚔ The Battle of Alesia — 52 BCE | https://yitachen.github.io/3d-battle-documentaries/alesia.html |
+| 🔥🌊 The Battle of Red Cliffs — 208 CE | https://yitachen.github.io/3d-battle-documentaries/redcliffs.html |
+| 🇺🇸⚜ The Siege of Yorktown — 1781 | https://yitachen.github.io/3d-battle-documentaries/yorktown.html |
 
 Every battle also has a **⚔ Battles** button in its control deck to jump
 straight to any other battle (each battle restarts from Act 1).
@@ -42,7 +42,7 @@ turned each note into code, re-verified, and shipped — typically in a
 
 # The Battle of Alesia — 52 BCE
 
-**Live demo: https://yitachen.github.io/battle-of-alesia-3d/alesia.html**
+**Live demo: https://yitachen.github.io/3d-battle-documentaries/alesia.html**
 
 ![Act 2 — Caesar begins the siege: the Alesia oppidum ringed by Roman fortifications, with the documentary UI, six-act timeline and playback controls](docs/screenshot.png)
 
@@ -107,7 +107,7 @@ relief army arriving across the western plain.
 
 # The Siege of Yorktown — 1781
 
-**Live demo: https://yitachen.github.io/battle-of-alesia-3d/yorktown.html**
+**Live demo: https://yitachen.github.io/3d-battle-documentaries/yorktown.html**
 
 ![Act 4 — the allied siege begins: Yorktown under bombardment from the First Parallel, ringed by the British works, the York River and Gloucester Point behind](docs/screenshot-yorktown.png)
 
@@ -146,7 +146,7 @@ land arc, the fleet closing the sea.
 
 # The Battle of Red Cliffs — 208 CE
 
-**Live demo: https://yitachen.github.io/battle-of-alesia-3d/redcliffs.html**
+**Live demo: https://yitachen.github.io/3d-battle-documentaries/redcliffs.html**
 
 ![Act 6 — fire walks the chains: the burning chained fleet lights the night Yangtze as Zhou Yu's squadrons drive in behind the fire ships](docs/screenshot-redcliffs.png)
 
