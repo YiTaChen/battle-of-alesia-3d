@@ -801,8 +801,8 @@ class Warship {
       this.fireT += dt;
       const ft = this.fireT;
       let target = 'Ignited';
-      if(ft > 26) target = (this.idx % 3 === 0) ? 'Destroyed' : 'Charred';
-      else if(ft > 13) target = 'Charred';
+      if(ft > 48 && this.idx % 3 === 0) target = 'Destroyed';
+      else if(ft > 30) target = 'Charred';
       else if(ft > 3) target = 'Burning';
       if(target !== this.state) this.applyState(target);
       this.animateFire(ft, t, dt);
@@ -844,19 +844,21 @@ class Warship {
     }
   }
   animateFire(ft, t, dt){
-    // flame size envelope: grows, peaks while Burning, dies to embers when Charred
+    // flame size envelope: a LONG full blaze (the whole chained grid burns
+    // together), then dying embers — though a few hulls burn on into the dawn
     let f = 0;
-    if(ft < 3) f = ft / 3 * 0.45;
-    else if(ft < 13) f = 0.65 + 0.35 * Math.sin((ft - 3) / 10 * Math.PI);
-    else if(ft < 26) f = Math.max(0.12, 0.5 - (ft - 13) * 0.03);   // embers
-    else f = this.state === 'Destroyed' ? 0 : 0.1;
+    if(ft < 3) f = ft / 3 * 0.5;
+    else if(ft < 30) f = 0.7 + 0.3 * Math.sin((ft - 3) / 27 * Math.PI);
+    else if(this.state === 'Destroyed') f = 0;
+    else if(this.idx % 4 === 1) f = 0.42 + 0.1 * Math.sin(t * 2 + this.idx); // still burning
+    else f = Math.max(0.08, 0.3 - (ft - 30) * 0.02);               // dying embers
     this.flames.forEach((fl, i) => {
       const n = Math.sin(t * 11 + i * 2.1 + this.idx) * 0.5 + 0.5;
       fl.material.opacity = f > 0.01 ? (0.5 + n * 0.4) * Math.min(1, f * 1.6) : 0;
       fl.scale.setScalar((5 + i * 3) * (0.4 + f) );
       fl.position.y = 4 + f * 6 + i * 2.4;
     });
-    const smokeAmt = ft < 26 ? Math.min(1, ft / 4) : 0.5;
+    const smokeAmt = ft < 30 ? Math.min(1, ft / 4) : (this.state === 'Destroyed' ? 0.25 : 0.55);
     this.smokes.forEach(s => {
       s.userData.k = (s.userData.k + dt * 0.14) % 1;
       const k = s.userData.k;
@@ -865,8 +867,8 @@ class Warship {
       s.material.opacity = 0.36 * (1 - k) * smokeAmt;
     });
     this.light.intensity = 90 * f * (0.8 + Math.sin(t * 13 + this.idx) * 0.2);
-    // only the actively-burning ships cast light (embers & wrecks don't)
-    this.light.visible = f > 0.2 && this.state !== 'Charred' && this.state !== 'Destroyed';
+    // burning ships cast light — including hulls still aflame after charring
+    this.light.visible = f > 0.2 && this.state !== 'Destroyed';
   }
 }
 
@@ -1215,7 +1217,7 @@ const chainGroup = new THREE.Group();
 function setChained(v){ chainGroup.visible = v; lblChain.visible = v; }
 
 /* fire spreads outward through the chained grid from the impact point */
-const fireWave = { active:false, t:0, origin:new THREE.Vector3(-60, 0, -95), speed:24 };
+const fireWave = { active:false, t:0, origin:new THREE.Vector3(-60, 0, -95), speed:30 };
 function startFireWave(preT = 0){
   fireWave.active = true; fireWave.t = preT;
 }
