@@ -469,6 +469,44 @@ updateHooks.push((dt, t) => {
   p.needsUpdate = true;
 });
 
+/* --- the Huarong road: a muddy track winding NW through the marshes.
+   Act 7's Romance episode (Guan Yu letting Cao Cao pass) plays out on it. --- */
+const HUARONG_PTS = [[-200,-385],[-300,-440],[-380,-470],[-440,-515],[-490,-562],
+                     [-560,-620],[-640,-690],[-710,-745]];
+function huarongDist(x, z){
+  let best = 1e9;
+  for(let i = 0; i < HUARONG_PTS.length - 1; i++){
+    const a = HUARONG_PTS[i], b = HUARONG_PTS[i+1];
+    for(let k = 0; k <= 4; k++){
+      const px = a[0] + (b[0]-a[0]) * k/4, pz = a[1] + (b[1]-a[1]) * k/4;
+      best = Math.min(best, Math.hypot(x - px, z - pz));
+    }
+  }
+  return best;
+}
+{
+  const verts = [], idx = [];
+  const W = 9;
+  for(let i = 0; i < HUARONG_PTS.length; i++){
+    const [x, z] = HUARONG_PTS[i];
+    const nx = HUARONG_PTS[Math.min(i+1, HUARONG_PTS.length-1)];
+    const pr = HUARONG_PTS[Math.max(i-1, 0)];
+    let dx = nx[0]-pr[0], dz = nx[1]-pr[1];
+    const L = Math.hypot(dx, dz); dx/=L; dz/=L;
+    const px = -dz, pz = dx;
+    for(const sgn of [-1, 1]){
+      const vx = x + px*W*sgn, vz = z + pz*W*sgn;
+      verts.push(vx, terrainHeight(vx, vz) + 0.5, vz);
+    }
+    if(i < HUARONG_PTS.length-1){ const a = i*2; idx.push(a, a+1, a+2, a+1, a+3, a+2); }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  scene.add(new THREE.Mesh(geo,
+    new THREE.MeshStandardMaterial({ color:0x4f4534, roughness:1 })));
+}
+
 /* --- trees on the banks --- */
 {
   const trunkG = new THREE.CylinderGeometry(0.5, 0.7, 4, 5);
@@ -485,6 +523,7 @@ updateHooks.push((dt, t) => {
     const x = (rnd()-0.5)*WORLD*0.92, z = (rnd()-0.5)*WORLD*0.92;
     const h = terrainHeight(x, z);
     if(h < 3.2) continue;
+    if(huarongDist(x, z) < 34) continue;                     // keep the Huarong road clear
     if(z < 0 && z > -460 && x > -420 && x < 160) continue;   // keep Cao camp clear
     if(z > 0 && z < 420 && x > 180 && x < 620) continue;     // keep allied shore clear
     const s = 0.7 + rnd()*0.9;
@@ -516,7 +555,7 @@ addMapLabel('RED CLIFFS', 120, 258, 48);
 addMapLabel('Wulin', -240, -290, 14, 'minor');
 addMapLabel("Cao Cao's Camp", -130, -345, 18, 'minor');
 addMapLabel('to Jiangling (upriver) →', -640, -260, 10, 'minor');
-addMapLabel('Huarong Road', -420, -430, 10, 'minor');
+addMapLabel('Huarong Road', -495, -570, 12, 'minor');
 const lblChain  = addMapLabel("Cao Cao's Chained Fleet", -110, -112, 26, 'minor');
 const lblAllied = addMapLabel('Sun-Liu Allied Fleet', 420, 105, 26, 'minor');
 const lblWind   = addMapLabel('⟵ ⟵ EASTERN WIND — the night it turned', 430, -40, 30, 'windlbl');
@@ -1483,6 +1522,23 @@ U.zhuge = new Unit({ key:'zhuge', faction:'liu', label:'Zhuge Liang', symbol:'�
     status:'Advising the alliance',
     desc:'Liu Bei\'s strategist, who argued Sun Quan into the war. The tale of him summoning the east wind from an altar is a Romance of the Three Kingdoms dramatization — the wind itself made the fire attack possible.' }});
 
+U.guanyu = new Unit({ key:'guanyu', faction:'liu', label:'Guan Yu', symbol:'關',
+  count:50, w:16, d:12, big:true,
+  info:{ role:'Liu Bei\'s sworn brother — ambush commander at Huarong',
+    strength:'~500 picked men (Romance figure)',
+    status:'Awaiting orders',
+    desc:'In Romance of the Three Kingdoms, Zhuge Liang posts Guan Yu astride the Huarong road — knowing Guan Yu owes Cao Cao an old debt of mercy, and knowing he will repay it by letting him pass. The episode is dramatization, not attested history.' }});
+U.guanyuL = new Unit({ key:'guanyuL', faction:'liu', label:'Ambush — Left Wing', symbol:'劉',
+  count:60, w:22, d:9,
+  info:{ role:'Ambush infantry, left of the road', strength:'(Romance dramatization)',
+    status:'In hiding',
+    desc:'Half of Guan Yu\'s ambush, drawn up in the marsh scrub on the left of the muddy track. When their commander relents, they ground their spears and stand aside.' }});
+U.guanyuR = new Unit({ key:'guanyuR', faction:'liu', label:'Ambush — Right Wing', symbol:'劉',
+  count:60, w:22, d:9,
+  info:{ role:'Ambush infantry, right of the road', strength:'(Romance dramatization)',
+    status:'In hiding',
+    desc:'The other half of the ambush, blocking the road from the right. At the signal they open their ranks and let the beaten column file through.' }});
+
 U.caocao.placeAt(-160, -680);
 U.caoInf.placeAt(-240, -700);
 U.sunquan.placeAt(470, 215);
@@ -1490,6 +1546,8 @@ U.zhouyu.placeAt(415, 165);
 U.huanggai.placeAt(465, 115);
 U.liubei.placeAt(565, 265);
 U.zhuge.placeAt(520, 305);
+U.guanyu.placeAt(-520, -600); U.guanyuL.placeAt(-472, -583); U.guanyuR.placeAt(-508, -541);
+[U.guanyu, U.guanyuL, U.guanyuR].forEach(u => u.setVisible(false));
 
 const victoryBanner = document.getElementById('victory-banner');
 
@@ -1797,6 +1855,14 @@ const ACTS = [
         U.caoInf.moveTo(-380, -470, 13); U.caoInf.setStatus('Fleeing through the marshes');
         document.getElementById('act-event').textContent =
           'Cao Cao abandons the anchorage and retreats overland through Huarong'; } },
+    { at: 15, fn(){
+        [U.guanyu, U.guanyuL, U.guanyuR].forEach(u => u.setVisible(true));
+        U.guanyu.placeAt(-290, -320);  U.guanyu.moveTo(-520, -600, 10);
+        U.guanyuL.placeAt(-320, -290); U.guanyuL.moveTo(-472, -583, 10);
+        U.guanyuR.placeAt(-265, -350); U.guanyuR.moveTo(-508, -541, 10);
+        [U.guanyu, U.guanyuL, U.guanyuR].forEach(u => u.setStatus('Racing ahead to the Huarong road'));
+        document.getElementById('act-event').textContent =
+          'Ferried over by night, Guan Yu races ahead to lie in wait on the Huarong road (Romance)'; } },
     { at: 18, fn(){
         alliedShips.forEach((sh, i) => {
           sh.moveTo(25 + (i % 3) * 34, -68 - (i % 4) * 22, 10 + (i % 3) * 2);
@@ -1812,11 +1878,13 @@ const ACTS = [
   ]
 },
 {
-  id: 7, title: 'Aftermath — The Three Kingdoms Take Shape', duration: 26,
+  id: 7, title: 'Aftermath — The Three Kingdoms Take Shape', duration: 36,
   desc: 'Dawn shows a river of charred, listing hulks. Cao Cao\'s bid to unify China in one campaign is finished; he holds the north but never again mounts such a stroke. Sun Quan keeps the Southland; Liu Bei takes root in the west. Wei, Wu and Shu — the Three Kingdoms — take shape.',
   event: 'RED & GREEN ALLIES VICTORIOUS — BLUE Cao Cao retreats north, his navy destroyed',
-  camera: [ [-110,210,160, -130,4,-115], [50,120,110, -80,4,-100],
-            [320,170,230, 430,5,130], [90,820,260, -60,0,-90] ],
+  camera: [ [-110,210,160, -130,4,-115], [-40,110,30, -200,6,-200],
+            [-300,140,-330, -460,8,-545], [-450,60,-480, -495,9,-565],
+            [-520,75,-440, -545,8,-610], [-260,420,-160, -350,0,-350],
+            [90,840,260, -120,0,-180] ],
   enter(){
     setMood(0xb8c0cc, 0xfff4e0, 1.35, 0.85);   // grey winter dawn
     resetChainedFleet(); resetFireShips();
@@ -1831,8 +1899,13 @@ const ACTS = [
       sh.placeAt(65 + (i % 3) * 42, -48 - (i % 4) * 26);
       sh.status = 'Holding the burned anchorage'; sh.opts.info.status = sh.status;
     });
-    U.caocao.placeAt(-420, -500); U.caocao.setStatus('Defeated — withdrawing north');
-    U.caoInf.placeAt(-380, -470); U.caoInf.setStatus('Decimated by fire, rout & disease');
+    U.caocao.placeAt(-355, -448); U.caocao.setStatus('Stumbling up the muddy road');
+    U.caoInf.placeAt(-310, -415); U.caoInf.setStatus('Exhausted — mud, hunger, disease');
+    // Guan Yu's ambush stands astride the road ahead of them
+    [U.guanyu, U.guanyuL, U.guanyuR].forEach(u => u.setVisible(true));
+    U.guanyu.placeAt(-520, -600);  U.guanyu.setStatus('Holding the Huarong road (Romance)');
+    U.guanyuL.placeAt(-472, -583); U.guanyuL.setStatus('Blocking the road — left of the track');
+    U.guanyuR.placeAt(-508, -541); U.guanyuR.setStatus('Blocking the road — right of the track');
     U.sunquan.setStatus('Victorious — the Southland stands');
     U.zhouyu.placeAt(190, 165);  U.zhouyu.setStatus('Victorious commander, ashore at the won anchorage');
     U.huanggai.placeAt(390, 140); U.huanggai.setStatus('The fire attack succeeded');
@@ -1841,10 +1914,24 @@ const ACTS = [
     setBars(5, 95, 25, 100);
   },
   triggers: [
-    { at: 10, fn(){ victoryBanner.classList.add('visible'); } },
-    { at: 15, fn(){ document.getElementById('act-event').textContent =
-        'On the Huarong road, Guan Yu lets the beaten Cao Cao pass (Romance dramatization)'; } },
-    { at: 21, fn(){ document.getElementById('act-event').textContent =
+    { at: 6, fn(){
+        U.caocao.moveTo(-438, -512, 7); U.caoInf.moveTo(-405, -482, 7);
+        document.getElementById('act-event').textContent =
+          'The fugitive column rounds the bend — and walks straight into Guan Yu\'s ambush'; } },
+    { at: 13, fn(){
+        // the ranks part: each wing steps aside, opening the road between them
+        U.guanyuL.moveTo(-430, -628, 5); U.guanyuL.setStatus('Standing aside');
+        U.guanyuR.moveTo(-550, -496, 5); U.guanyuR.setStatus('Standing aside');
+        U.guanyu.moveTo(-565, -635, 6);  U.guanyu.setStatus('Repaying an old debt of mercy');
+        document.getElementById('act-event').textContent =
+          'Guan Yu remembers Cao Cao\'s old kindness — his ranks open and stand aside (Romance dramatization)'; } },
+    { at: 18, fn(){
+        U.caocao.moveTo(-635, -700, 9); U.caocao.setStatus('Spared — escaping north');
+        U.caoInf.moveTo(-600, -668, 10); U.caoInf.setStatus('Filing through the parted ranks');
+        document.getElementById('act-event').textContent =
+          'The blue column files through the gap and vanishes north toward Jiangling (Romance)'; } },
+    { at: 26, fn(){ victoryBanner.classList.add('visible'); } },
+    { at: 31, fn(){ document.getElementById('act-event').textContent =
         'Wei in the north, Wu in the southeast, Shu in the west — the Three Kingdoms era begins'; } }
   ]
 }];
@@ -1891,6 +1978,7 @@ function restoreAlliedFleet(){
     s.status = 'At anchor'; s.opts.info.status = 'At anchor';
   });
   U.zhouyu.setVisible(true);     // back ashore unless an act puts him aboard
+  [U.guanyu, U.guanyuL, U.guanyuR].forEach(u => u.setVisible(false));   // Huarong acts re-show
 }
 
 function setAct(i){
