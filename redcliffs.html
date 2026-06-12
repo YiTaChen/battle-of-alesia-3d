@@ -1761,6 +1761,14 @@ const ACTS = [
     lblAllied.visible = true; lblRoute.visible = true;
     assaultArrows.fireRoute.visible = true;
     fireShips.forEach((fs, i) => { fs.setVisible(true); fs.placeAt(320 - (i%2)*20, 65 + i*16); });
+    // Zhuge Liang has already read the night: Guan Yu is ferried over
+    // downstream and marches through the northern marshes to Huarong,
+    // arcing wide around Cao Cao's camp — in position before the rout
+    [U.guanyu, U.guanyuL, U.guanyuR].forEach(u => u.setVisible(true));
+    U.guanyu.placeAt(140, -430);  U.guanyu.moveTo(-520, -600, 22);
+    U.guanyuL.placeAt(175, -405); U.guanyuL.moveTo(-472, -583, 22);
+    U.guanyuR.placeAt(110, -460); U.guanyuR.moveTo(-508, -541, 22);
+    [U.guanyu, U.guanyuL, U.guanyuR].forEach(u => u.setStatus('Night march to Huarong (Romance)'));
     U.zhuge.setStatus('On the altar hill (Romance dramatization)');
     U.huanggai.setStatus('Squadron loaded — waiting on the wind');
     U.zhouyu.setStatus('Fleet at battle stations');
@@ -1769,6 +1777,8 @@ const ACTS = [
     setBars(88, 80, 5, 0);
   },
   triggers: [
+    { at: 2, fn(){ document.getElementById('act-event').textContent =
+        'Foreseeing the rout, Zhuge Liang has already sent Guan Yu north to wait at Huarong (Romance)'; } },
     { at: 4, fn(){
         setWind('calm', 0.15, true);
         document.getElementById('act-event').textContent =
@@ -1822,6 +1832,11 @@ const ACTS = [
       fs.setVisible(true); fs.ignite();
       fs.placeAt(-60 + (i%2)*26 - 10, -95 + (i%2)*18 + (i>=2 ? 30 : -8));
     });
+    // Guan Yu reached Huarong during the night — the trap is already set
+    [U.guanyu, U.guanyuL, U.guanyuR].forEach(u => u.setVisible(true));
+    U.guanyu.placeAt(-520, -600);  U.guanyu.setStatus('Lying in ambush at Huarong (Romance)');
+    U.guanyuL.placeAt(-472, -583); U.guanyuL.setStatus('Hidden in the scrub — left of the track');
+    U.guanyuR.placeAt(-508, -541); U.guanyuR.setStatus('Hidden in the scrub — right of the track');
     // the allied fleet is already driving upriver hard behind the fire
     alliedShips.forEach((sh, i) => {
       sh.placeAt(230 + (i % 3) * 40, 30 - (i % 4) * 25);
@@ -1856,13 +1871,8 @@ const ACTS = [
         document.getElementById('act-event').textContent =
           'Cao Cao abandons the anchorage and retreats overland through Huarong'; } },
     { at: 15, fn(){
-        [U.guanyu, U.guanyuL, U.guanyuR].forEach(u => u.setVisible(true));
-        U.guanyu.placeAt(-290, -320);  U.guanyu.moveTo(-520, -600, 10);
-        U.guanyuL.placeAt(-320, -290); U.guanyuL.moveTo(-472, -583, 10);
-        U.guanyuR.placeAt(-265, -350); U.guanyuR.moveTo(-508, -541, 10);
-        [U.guanyu, U.guanyuL, U.guanyuR].forEach(u => u.setStatus('Racing ahead to the Huarong road'));
         document.getElementById('act-event').textContent =
-          'Ferried over by night, Guan Yu races ahead to lie in wait on the Huarong road (Romance)'; } },
+          'Far ahead of the fleeing column, Guan Yu\'s ambush already waits in silence at Huarong (Romance)'; } },
     { at: 18, fn(){
         alliedShips.forEach((sh, i) => {
           sh.moveTo(25 + (i % 3) * 34, -68 - (i % 4) * 22, 10 + (i % 3) * 2);
