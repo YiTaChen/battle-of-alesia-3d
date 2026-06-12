@@ -43,6 +43,13 @@
   #legend h3{font-size:11px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;
     margin-bottom:7px;border-bottom:1px solid var(--panel-border);padding-bottom:5px;}
   .legend-row{display:flex;align-items:center;gap:8px;margin:4px 0;}
+  .alliance-box{border:1px solid rgba(255,255,255,0.10);border-radius:6px;
+    padding:5px 8px;margin:6px 0;}
+  .alliance-box.allied{border-color:rgba(96,140,255,0.5);background:rgba(37,99,235,0.10);}
+  .alliance-box.british{border-color:rgba(220,38,38,0.5);background:rgba(220,38,38,0.08);}
+  .alliance-title{font-size:9.5px;letter-spacing:1.5px;text-transform:uppercase;
+    margin-bottom:3px;color:#9fb6e8;}
+  .alliance-box.british .alliance-title{color:#e89f9f;}
   .swatch{width:13px;height:13px;border-radius:3px;flex:0 0 auto;box-shadow:0 0 6px rgba(0,0,0,0.5);}
   .line-swatch{width:22px;height:0;border-top:3px solid;flex:0 0 auto;}
   .dashed{border-top-style:dashed !important;}
@@ -104,6 +111,18 @@
     color:var(--gold);text-transform:uppercase;margin:6px 0 4px;}
   #victory-banner p{font-size:13px;color:#cfc9bd;letter-spacing:1px;}
   #victory-banner .sub{font-size:11px;color:#8d887c;margin-top:6px;}
+  #victory-banner .vb-sides{display:flex;align-items:center;justify-content:center;
+    gap:12px;margin:10px 0 8px;font-size:12.5px;color:#e8e2d2;}
+  #victory-banner .vb-team{display:inline-flex;align-items:center;gap:3px;
+    padding:4px 10px;border-radius:6px;letter-spacing:0.5px;}
+  #victory-banner .vb-team.winner{border:1px solid rgba(96,140,255,0.55);
+    background:rgba(37,99,235,0.14);}
+  #victory-banner .vb-team.loser{border:1px solid rgba(220,38,38,0.55);
+    background:rgba(220,38,38,0.10);color:#d8b8b0;}
+  #victory-banner .vb-sw{display:inline-block;width:13px;height:13px;border-radius:3px;
+    margin-right:2px;box-shadow:0 0 6px rgba(0,0,0,0.6);}
+  #victory-banner .vb-def{color:#8d887c;font-size:10.5px;letter-spacing:2px;
+    text-transform:uppercase;}
 
   /* ==================== UI : INFO CARD ==================== */
   #info-card{position:fixed;z-index:20;width:270px;background:rgba(10,12,18,0.94);
@@ -177,10 +196,16 @@
 <!-- ==================== LEGEND ==================== -->
 <div id="legend">
   <h3>Forces &amp; Lines</h3>
-  <div class="legend-row"><span class="swatch" style="background:var(--usa)"></span>Continental Army — Washington</div>
-  <div class="legend-row"><span class="swatch" style="background:var(--fra)"></span>French Army — Rochambeau</div>
-  <div class="legend-row"><span class="swatch" style="background:var(--nav)"></span>French Navy — de Grasse</div>
-  <div class="legend-row"><span class="swatch" style="background:var(--gbr)"></span>British Army — Cornwallis</div>
+  <div class="alliance-box allied">
+    <div class="alliance-title">★ The Allies — same side</div>
+    <div class="legend-row"><span class="swatch" style="background:var(--usa)"></span>Continental Army — Washington</div>
+    <div class="legend-row"><span class="swatch" style="background:var(--fra)"></span>French Army — Rochambeau</div>
+    <div class="legend-row"><span class="swatch" style="background:var(--nav)"></span>French Navy — de Grasse</div>
+  </div>
+  <div class="alliance-box british">
+    <div class="alliance-title">♔ Great Britain — besieged</div>
+    <div class="legend-row"><span class="swatch" style="background:var(--gbr)"></span>British Army — Cornwallis</div>
+  </div>
   <div class="legend-row"><span class="line-swatch" style="border-color:var(--gbr)"></span>British Defensive Line</div>
   <div class="legend-row"><span class="line-swatch" style="border-color:var(--gold)"></span>Allied Siege Parallels</div>
   <div class="legend-row"><span class="line-swatch dashed" style="border-color:var(--nav)"></span>French Naval Blockade</div>
@@ -231,6 +256,17 @@
 <div id="victory-banner">
   <div class="laurel">🇺🇸 ⚜ 🇫🇷</div>
   <h2>Allied Victory</h2>
+  <div class="vb-sides">
+    <span class="vb-team winner">
+      <span class="vb-sw" style="background:var(--usa)"></span><span
+        class="vb-sw" style="background:var(--fra)"></span><span
+        class="vb-sw" style="background:var(--nav)"></span>
+      The Allies — WIN</span>
+    <span class="vb-def">defeat</span>
+    <span class="vb-team loser">
+      <span class="vb-sw" style="background:var(--gbr)"></span>
+      Britain — surrenders</span>
+  </div>
   <p>Cornwallis surrenders ~8,000 men (estimated)</p>
   <div class="sub">"The World Turned Upside Down" — the decisive end of the War of Independence</div>
 </div>
@@ -240,6 +276,7 @@
   <span class="close-x" id="info-close">✕</span>
   <h3 id="ic-name"></h3>
   <span class="faction-tag" id="ic-faction"></span>
+  <div class="stat"><span>Side</span><span id="ic-side"></span></div>
   <div class="stat"><span>Role</span><span id="ic-role"></span></div>
   <div class="stat"><span>Strength</span><span id="ic-strength"></span></div>
   <div class="stat"><span>Status</span><span id="ic-status"></span></div>
@@ -780,10 +817,14 @@ function setCampsVisible(v){
    Naval units = lines of square-rigged ships that sail and bob.
    ===================================================================== */
 const FACTIONS = {
-  usa: { color:0x2563eb, dark:0x1e40af, css:'usa', name:'Continental Army' },
-  fra: { color:0xe8dfc2, dark:0xa8862e, css:'fra', name:'French Army' },
-  nav: { color:0x8b5cf6, dark:0x5b21b6, css:'nav', name:'French Navy' },
-  gbr: { color:0xdc2626, dark:0x991b1b, css:'gbr', name:'British Army' },
+  usa: { color:0x2563eb, dark:0x1e40af, css:'usa', name:'Continental Army',
+         side:'★ The Allies (US + France)', sideIcon:'★' },
+  fra: { color:0xe8dfc2, dark:0xa8862e, css:'fra', name:'French Army',
+         side:'★ The Allies (US + France)', sideIcon:'★' },
+  nav: { color:0x8b5cf6, dark:0x5b21b6, css:'nav', name:'French Navy',
+         side:'★ The Allies (US + France)', sideIcon:'★' },
+  gbr: { color:0xdc2626, dark:0x991b1b, css:'gbr', name:'British Army',
+         side:'♔ Great Britain', sideIcon:'♔' },
 };
 
 function makeFlagTexture(hex, symbol, textHex){
@@ -871,7 +912,7 @@ class Unit {
 
     const div = document.createElement('div');
     div.className = 'unit-label ' + f.css;
-    div.textContent = opts.label;
+    div.textContent = f.sideIcon + ' ' + opts.label;
     div.addEventListener('click', (e) => { e.stopPropagation(); showInfoCard(this, e); });
     this.labelObj = new CSS2DObject(div);
     this.labelObj.position.set(0, opts.big ? 30 : 22, 0);
@@ -978,7 +1019,7 @@ class Fleet {
 
     const div = document.createElement('div');
     div.className = 'unit-label ' + f.css;
-    div.textContent = opts.label;
+    div.textContent = f.sideIcon + ' ' + opts.label;
     div.addEventListener('click', (e) => { e.stopPropagation(); showInfoCard(this, e); });
     this.labelObj = new CSS2DObject(div);
     this.labelObj.position.set(0, 42, 0);
@@ -1174,6 +1215,9 @@ function showInfoCard(unit, ev){
   const tag = document.getElementById('ic-faction');
   tag.textContent = f.name;
   tag.style.background = '#' + f.dark.toString(16).padStart(6,'0');
+  const sideEl = document.getElementById('ic-side');
+  sideEl.textContent = f.side;
+  sideEl.style.color = f.css === 'gbr' ? '#e89f9f' : '#9fb6e8';
   document.getElementById('ic-role').textContent = unit.opts.info.role;
   document.getElementById('ic-strength').textContent = unit.opts.info.strength;
   document.getElementById('ic-status').textContent = unit.status;
