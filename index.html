@@ -457,12 +457,442 @@ const lblOuter = addMapLabel('Roman Outer Defense Line', OUTER_R*0.07, -(OUTER_R
 lblInner.visible = lblOuter.visible = false;   // revealed when the lines are built
 
 /* =====================================================================
-   SECTION 4 : FORTIFICATIONS  (filled in build stage 2)
+   SECTION 4 : FORTIFICATIONS
+   Inner siege line (circumvallation, vs. Alesia) and outer defense
+   line (contravallation, vs. the relief army). Built progressively
+   during Acts 2–3 via setLineProgress().
    ===================================================================== */
+const woodMat  = new THREE.MeshStandardMaterial({ color:0x7a5c38, roughness:0.9 });
+const woodDark = new THREE.MeshStandardMaterial({ color:0x5b4226, roughness:0.95 });
+const stakeMat = new THREE.MeshStandardMaterial({ color:0x4a3520, roughness:1 });
+
+function buildSiegeLine(radius, segCount, towerEvery, withTraps){
+  const group = new THREE.Group();
+  const segments = [];
+  const wallG  = new THREE.BoxGeometry(1, 7, 1);     // unit box, scaled per segment
+  const towerG = new THREE.BoxGeometry(9, 22, 9);
+  const roofG  = new THREE.ConeGeometry(8, 5, 4);
+  const stakeG = new THREE.ConeGeometry(0.7, 4, 5);
+
+  for(let i = 0; i < segCount; i++){
+    const a0 = (i / segCount) * Math.PI * 2;
+    const a1 = ((i + 1) / segCount) * Math.PI * 2;
+    const am = (a0 + a1) / 2;
+    const x = Math.cos(am) * radius, z = Math.sin(am) * radius;
+    const y = groundY(x, z);
+    const segLen = radius * (a1 - a0) * 1.04;
+    const seg = new THREE.Group();
+    seg.position.set(x, y, z);
+    seg.rotation.y = -am;
+
+    // palisade wall
+    const wall = new THREE.Mesh(wallG, woodMat);
+    wall.scale.set(2.2, 1, segLen);
+    wall.position.y = 3.5;
+    wall.castShadow = true;
+    seg.add(wall);
+
+    // watchtower every N segments
+    if(i % towerEvery === 0){
+      const tw = new THREE.Mesh(towerG, woodDark);
+      tw.position.y = 11; tw.castShadow = true;
+      const roof = new THREE.Mesh(roofG, woodMat);
+      roof.position.y = 24.5; roof.rotation.y = Math.PI/4;
+      seg.add(tw, roof);
+      seg.userData.tower = true;
+    }
+
+    // sharpened stakes / abatis in front of the wall (facing the enemy)
+    if(withTraps && i % 2 === 0){
+      const dir = radius === INNER_R ? -1 : 1;  // inner line faces inward, outer faces outward
+      for(let s = 0; s < 5; s++){
+        const st = new THREE.Mesh(stakeG, stakeMat);
+        st.position.set(dir * (6 + (s % 2) * 3), 1.6, (s - 2) * segLen / 5.5);
+        st.rotation.z = dir * 0.7;
+        seg.add(st);
+      }
+    }
+
+    seg.visible = false;
+    seg.userData.finalScaleY = 1;
+    group.add(seg);
+    segments.push(seg);
+  }
+  scene.add(group);
+  return { group, segments, progress: 0, target: 0 };
+}
+
+/* trench rings (dark earth) that appear with the walls */
+function buildTrenchRing(radius, width){
+  const geo = new THREE.RingGeometry(radius - width, radius + width, 128, 1);
+  geo.rotateX(-Math.PI/2);
+  const p = geo.attributes.position;
+  for(let i = 0; i < p.count; i++){
+    const x = p.getX(i), z = p.getZ(i);
+    p.setY(i, groundY(x, z) + 0.35);
+  }
+  geo.computeVertexNormals();
+  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    color:0x3d3225, roughness:1, transparent:true, opacity:0 }));
+  scene.add(m);
+  return m;
+}
+
+const innerLine = buildSiegeLine(INNER_R, 64, 4, true);
+const outerLine = buildSiegeLine(OUTER_R, 88, 4, true);
+const innerTrench = buildTrenchRing(INNER_R - 9, 5);
+const outerTrench = buildTrenchRing(OUTER_R + 9, 5);
+
+function setLineTarget(line, t){ line.target = t; }
+updateHooks.push((dt) => {
+  for(const [line, trench, lbl] of [
+      [innerLine, innerTrench, lblInner], [outerLine, outerTrench, lblOuter]]){
+    if(Math.abs(line.progress - line.target) < 0.001) continue;
+    line.progress += Math.sign(line.target - line.progress) * dt * 0.12;
+    line.progress = Math.min(1, Math.max(0, line.progress));
+    const n = line.segments.length;
+    line.segments.forEach((seg, i) => {
+      const segP = Math.min(1, Math.max(0, line.progress * n - i)); // sequential build
+      seg.visible = segP > 0.02;
+      seg.scale.y = Math.max(0.02, segP);
+    });
+    trench.material.opacity = Math.min(0.85, line.progress * 1.2);
+    lbl.visible = line.progress > 0.35;
+  }
+});
+
+/* --- Roman camps: rectangular palisade + tents --- */
+function buildCamp(x, z, size, name){
+  const g = new THREE.Group();
+  const y = groundY(x, z);
+  g.position.set(x, y, z);
+  const wallH = 5;
+  const wallG = new THREE.BoxGeometry(size, wallH, 1.6);
+  for(let i = 0; i < 4; i++){
+    const w = new THREE.Mesh(wallG, woodMat);
+    w.castShadow = true;
+    const half = size / 2;
+    if(i === 0) w.position.set(0, wallH/2, -half);
+    if(i === 1) w.position.set(0, wallH/2, half);
+    if(i === 2){ w.position.set(-half, wallH/2, 0); w.rotation.y = Math.PI/2; }
+    if(i === 3){ w.position.set(half, wallH/2, 0); w.rotation.y = Math.PI/2; }
+    g.add(w);
+  }
+  const tentG = new THREE.ConeGeometry(2.6, 3.4, 4);
+  const tentM = new THREE.MeshStandardMaterial({ color:0xc9b896, roughness:0.9 });
+  let seed = x * 31 + z * 17; const rnd = () => { seed = (seed * 16807 + 11) % 2147483647; return (seed < 0 ? -seed : seed) / 2147483647; };
+  const rows = Math.floor(size / 9);
+  for(let i = 0; i < rows; i++) for(let j = 0; j < rows; j++){
+    if(rnd() < 0.25) continue;
+    const tent = new THREE.Mesh(tentG, tentM);
+    tent.position.set((i - rows/2 + 0.5) * 8, 1.7, (j - rows/2 + 0.5) * 8);
+    tent.rotation.y = Math.PI/4;
+    tent.castShadow = true;
+    g.add(tent);
+  }
+  scene.add(g);
+  if(name) addMapLabel(name, x, z, 22, true);
+  return g;
+}
+const caesarCamp = buildCamp(300, 260, 64, "Caesar's Camp");
+buildCamp(-95, 215, 36, null);     // legionary camps between the lines
+buildCamp(210, -95, 36, null);
+buildCamp(-60, -218, 36, null);
+
+/* --- Alesia oppidum: town wall + huts on the plateau --- */
+{
+  const g = new THREE.Group();
+  const wallR = PLATEAU_R * 0.82;
+  const segN = 40;
+  const stoneMat = new THREE.MeshStandardMaterial({ color:0x9d9484, roughness:0.95 });
+  for(let i = 0; i < segN; i++){
+    const am = (i + 0.5) / segN * Math.PI * 2;
+    const x = Math.cos(am) * wallR, z = Math.sin(am) * wallR;
+    const w = new THREE.Mesh(new THREE.BoxGeometry(2.6, 8, wallR * Math.PI * 2 / segN * 1.05), stoneMat);
+    w.position.set(x, groundY(x, z) + 4, z);
+    w.rotation.y = -am;
+    w.castShadow = true;
+    g.add(w);
+  }
+  // huts
+  const hutWall = new THREE.CylinderGeometry(3, 3, 3, 7);
+  const hutRoof = new THREE.ConeGeometry(3.8, 3, 7);
+  const hutM = new THREE.MeshStandardMaterial({ color:0xb09a72, roughness:1 });
+  const roofM = new THREE.MeshStandardMaterial({ color:0x8a6f45, roughness:1 });
+  let seed = 13; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for(let i = 0; i < 46; i++){
+    const a = rnd() * Math.PI * 2, r = rnd() * wallR * 0.78;
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    const y = groundY(x, z);
+    const hw = new THREE.Mesh(hutWall, hutM);
+    hw.position.set(x, y + 1.5, z); hw.castShadow = true;
+    const hr = new THREE.Mesh(hutRoof, roofM);
+    hr.position.set(x, y + 4.4, z);
+    g.add(hw, hr);
+  }
+  scene.add(g);
+}
 
 /* =====================================================================
-   SECTION 5 : UNITS & FLAGS  (filled in build stage 2)
+   SECTION 5 : UNITS & FLAGS
+   Armies are unit blocks of instanced soldiers + a standard (flag) +
+   a clickable label. Blocks are choreographed by the act system.
    ===================================================================== */
+const FACTIONS = {
+  rome:   { color:0x3b82f6, dark:0x1d4ed8, css:'rome',   name:'Roman Army' },
+  verc:   { color:0xef4444, dark:0xb91c1c, css:'verc',   name:'Gallic Defenders' },
+  relief: { color:0x22c55e, dark:0x15803d, css:'relief', name:'Gallic Relief Army' },
+};
+
+function makeFlagTexture(hex, symbol){
+  const cv = document.createElement('canvas');
+  cv.width = 128; cv.height = 96;
+  const c = cv.getContext('2d');
+  c.fillStyle = '#' + hex.toString(16).padStart(6, '0');
+  c.fillRect(0, 0, 128, 96);
+  c.strokeStyle = 'rgba(255,255,255,0.85)'; c.lineWidth = 5;
+  c.strokeRect(5, 5, 118, 86);
+  c.fillStyle = '#fff'; c.font = 'bold 44px Georgia'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(symbol, 64, 52);
+  const tx = new THREE.CanvasTexture(cv);
+  tx.colorSpace = THREE.SRGBColorSpace;
+  return tx;
+}
+
+function makeStandard(factionKey, symbol, big = false){
+  const f = FACTIONS[factionKey];
+  const g = new THREE.Group();
+  const poleH = big ? 26 : 18;
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.35, 0.45, poleH, 6),
+    new THREE.MeshStandardMaterial({ color:0x4a3a26, roughness:0.9 }));
+  pole.position.y = poleH / 2;
+  const flagW = big ? 14 : 10, flagH = big ? 9 : 7;
+  const flagGeo = new THREE.PlaneGeometry(flagW, flagH, 8, 4);
+  const flag = new THREE.Mesh(flagGeo,
+    new THREE.MeshStandardMaterial({ map: makeFlagTexture(f.color, symbol),
+      side: THREE.DoubleSide, roughness:0.85 }));
+  flag.position.set(flagW / 2 + 0.4, poleH - flagH / 2 - 0.5, 0);
+  flag.userData.baseX = [];
+  g.add(pole, flag);
+  // waving animation
+  const pos = flagGeo.attributes.position;
+  const base = pos.array.slice();
+  updateHooks.push((dt, t) => {
+    if(!g.visible || !g.parent?.visible) return;
+    for(let i = 0; i < pos.count; i++){
+      const x0 = base[i*3], y0 = base[i*3+1];
+      pos.setZ(i, Math.sin(x0 * 0.55 + t * 4.2) * 0.55 * ((x0 + flagW/2) / flagW));
+      pos.setY(i, y0 + Math.sin(x0 * 0.4 + t * 3.1) * 0.18);
+    }
+    pos.needsUpdate = true;
+  });
+  return g;
+}
+
+const clickables = [];   // meshes that open the info card
+const allUnits = [];
+
+class Unit {
+  constructor(opts){
+    // opts: key, faction, label, symbol, count, w, d, info{role,strength,status,desc}, big
+    const f = FACTIONS[opts.faction];
+    this.opts = opts;
+    this.faction = opts.faction;
+    this.group = new THREE.Group();
+
+    // instanced soldiers in formation
+    const soldierG = new THREE.CapsuleGeometry(0.85, 2.0, 3, 8);
+    const soldierM = new THREE.MeshStandardMaterial({ color:f.color, roughness:0.7 });
+    const n = opts.count;
+    const mesh = new THREE.InstancedMesh(soldierG, soldierM, n);
+    mesh.castShadow = true;
+    const dummy = new THREE.Object3D();
+    let seed = opts.key.length * 977 + 13;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const cols = Math.ceil(Math.sqrt(n * opts.w / opts.d));
+    const rows = Math.ceil(n / cols);
+    this.slots = [];
+    for(let i = 0; i < n; i++){
+      const cx = ((i % cols) / (cols - 1 || 1) - 0.5) * opts.w + (rnd() - 0.5) * 1.6;
+      const cz = ((Math.floor(i / cols)) / (rows - 1 || 1) - 0.5) * opts.d + (rnd() - 0.5) * 1.6;
+      this.slots.push([cx, cz]);
+      dummy.position.set(cx, 1.9, cz);
+      dummy.rotation.y = (rnd() - 0.5) * 0.4;
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    }
+    mesh.userData.unit = this;
+    this.mesh = mesh;
+    this.group.add(mesh);
+    clickables.push(mesh);
+
+    // standard
+    this.standard = makeStandard(opts.faction, opts.symbol, opts.big);
+    this.standard.position.set(0, 0, -opts.d / 2 - 2);
+    this.group.add(this.standard);
+
+    // clickable label
+    const div = document.createElement('div');
+    div.className = 'unit-label ' + f.css;
+    div.textContent = opts.label;
+    div.addEventListener('click', (e) => { e.stopPropagation(); showInfoCard(this, e); });
+    this.labelObj = new CSS2DObject(div);
+    this.labelObj.position.set(0, opts.big ? 30 : 22, 0);
+    this.group.add(this.labelObj);
+
+    // movement state
+    this.pos = new THREE.Vector3();
+    this.from = new THREE.Vector3();
+    this.to = new THREE.Vector3();
+    this.moveT = 1; this.moveDur = 1;
+    this.status = opts.info.status;
+
+    scene.add(this.group);
+    allUnits.push(this);
+    updateHooks.push((dt) => this.update(dt));
+  }
+  placeAt(x, z){
+    this.pos.set(x, 0, z);
+    this.from.copy(this.pos); this.to.copy(this.pos); this.moveT = 1;
+    this.applyPos();
+  }
+  moveTo(x, z, dur = 8, faceTarget = true){
+    this.from.copy(this.pos);
+    this.to.set(x, 0, z);
+    this.moveDur = dur; this.moveT = 0;
+    if(faceTarget && this.to.distanceTo(this.from) > 1){
+      this.group.rotation.y = Math.atan2(
+        -(this.to.z - this.from.z), this.to.x - this.from.x) - Math.PI / 2;
+    }
+  }
+  applyPos(){
+    const y = groundY(this.pos.x, this.pos.z);
+    this.group.position.set(this.pos.x, y, this.pos.z);
+  }
+  update(dt){
+    if(this.moveT < 1){
+      this.moveT = Math.min(1, this.moveT + dt / this.moveDur);
+      const e = this.moveT < 0.5 ? 2*this.moveT*this.moveT : 1 - Math.pow(-2*this.moveT + 2, 2) / 2;
+      this.pos.lerpVectors(this.from, this.to, e);
+      this.applyPos();
+    }
+  }
+  setVisible(v){ this.group.visible = v; }
+  setStatus(s){ this.status = s; }
+}
+
+/* ---------- the armies (strengths are ancient-source estimates) ---------- */
+const U = {};
+
+// ROME — Julius Caesar
+U.caesar = new Unit({ key:'caesar', faction:'rome', label:'Julius Caesar', symbol:'SPQR',
+  count:60, w:18, d:14, big:true,
+  info:{ role:'Proconsul / Supreme Commander', strength:'~10 legions, ~50,000 (estimated)',
+    status:'Commanding the siege',
+    desc:'Gaius Julius Caesar, Roman proconsul of Gaul. At Alesia he ordered a double ring of fortifications — facing inward against the town and outward against the relief army — one of the most audacious siege works in ancient history.' }});
+U.legio1 = new Unit({ key:'legio1', faction:'rome', label:'Legions — North', symbol:'X',
+  count:110, w:34, d:12,
+  info:{ role:'Heavy infantry (legionaries)', strength:'~2 legions (approximate)',
+    status:'Manning the siege lines',
+    desc:'Roman legionaries holding the northern sector of the fortifications, rotating between construction work and wall duty.' }});
+U.legio2 = new Unit({ key:'legio2', faction:'rome', label:'Legions — West', symbol:'VII',
+  count:110, w:34, d:12,
+  info:{ role:'Heavy infantry (legionaries)', strength:'~2 legions (approximate)',
+    status:'Defending the Plain of Laumes sector',
+    desc:'The western sector faces the open Plain of Laumes — the most vulnerable stretch of the double line, and the focus of the heaviest fighting.' }});
+U.legio3 = new Unit({ key:'legio3', faction:'rome', label:'Legions — South', symbol:'IX',
+  count:110, w:34, d:12,
+  info:{ role:'Heavy infantry (legionaries)', strength:'~2 legions (approximate)',
+    status:'Manning the siege lines',
+    desc:'Legionaries guarding the southern river valley sector of the circumvallation.' }});
+U.romCav = new Unit({ key:'romcav', faction:'rome', label:'Roman & Germanic Cavalry', symbol:'EQ',
+  count:70, w:26, d:10,
+  info:{ role:'Cavalry (incl. Germanic auxiliaries)', strength:'several thousand (estimated)',
+    status:'Reserve — counter-attack force',
+    desc:'Caesar\'s cavalry, including Germanic auxiliaries, screened the army and delivered the decisive flank charge against the relief force in the final battle.' }});
+
+// GAUL (inside) — Vercingetorix
+U.verc = new Unit({ key:'verc', faction:'verc', label:'Vercingetorix', symbol:'⚔',
+  count:50, w:16, d:12, big:true,
+  info:{ role:'King of the Arverni / Gallic war-leader', strength:'~80,000 in Alesia (ancient estimate)',
+    status:'Besieged in Alesia',
+    desc:'Vercingetorix united the Gallic tribes in revolt against Rome. After Gergovia he withdrew into Alesia, expecting to pin Caesar against the walls until a huge relief army arrived.' }});
+U.gaulGarrison = new Unit({ key:'garrison', faction:'verc', label:'Gallic Garrison', symbol:'∞',
+  count:120, w:30, d:16,
+  info:{ role:'Infantry — defenders of Alesia', strength:'~80,000 incl. warriors (estimated)',
+    status:'Holding the oppidum',
+    desc:'The Gallic army inside Alesia: Arverni and allied warriors. As the siege tightened, food ran out within weeks.' }});
+U.gaulSortie = new Unit({ key:'sortie', faction:'verc', label:'Sortie Force', symbol:'➶',
+  count:90, w:26, d:12,
+  info:{ role:'Assault infantry', strength:'tens of thousands (estimated)',
+    status:'Awaiting the breakout signal',
+    desc:'Picked warriors who attacked the Roman inner line from within, timed to coincide with the relief army\'s assaults from outside.' }});
+
+// GAUL (outside) — Relief Army
+U.reliefMain = new Unit({ key:'reliefmain', faction:'relief', label:'Gallic Relief Army', symbol:'☘',
+  count:160, w:46, d:18, big:true,
+  info:{ role:'Confederate relief force', strength:'~250,000 (ancient claim — likely exaggerated)',
+    status:'Deploying on the Plain of Laumes',
+    desc:'A vast coalition mustered from across Gaul to break the siege. Ancient sources claim a quarter-million men; modern historians consider this exaggerated, but it greatly outnumbered Caesar\'s army.' }});
+U.reliefCav = new Unit({ key:'reliefcav', faction:'relief', label:'Gallic Cavalry', symbol:'♞',
+  count:80, w:30, d:10,
+  info:{ role:'Cavalry', strength:'~8,000 (estimated)',
+    status:'Probing the Roman outer line',
+    desc:'Gallic horsemen who fought repeated cavalry battles on the plain before the main assaults.' }});
+U.reliefElite = new Unit({ key:'reliefelite', faction:'relief', label:'Relief Commanders', symbol:'★',
+  count:90, w:26, d:12,
+  info:{ role:'Picked assault force — Gallic Relief Commanders', strength:'~60,000 picked men (ancient estimate)',
+    status:'Flanking via Mont Réa',
+    desc:'Led by the relief army\'s commanders (incl. Vercassivellaunus, kinsman of Vercingetorix), this force marched by night to strike the weak Roman camp below Mont Réa in the final assault.' }});
+
+/* ---------- initial deployment (pre-battle) ---------- */
+U.caesar.placeAt(330, 300);          // approaching from the SE
+U.legio1.placeAt(420, 180);
+U.legio2.placeAt(430, 260);
+U.legio3.placeAt(480, 230);
+U.romCav.placeAt(390, 340);
+U.verc.placeAt(-340, -40);           // retreating across the western plain
+U.gaulGarrison.placeAt(-390, 10);
+U.gaulSortie.placeAt(-430, -60);
+U.reliefMain.setVisible(false); U.reliefMain.placeAt(-620, 40);
+U.reliefCav.setVisible(false);  U.reliefCav.placeAt(-600, -120);
+U.reliefElite.setVisible(false); U.reliefElite.placeAt(-640, -220);
+
+/* ---------- info card ---------- */
+const infoCard = document.getElementById('info-card');
+function showInfoCard(unit, ev){
+  const f = FACTIONS[unit.faction];
+  document.getElementById('ic-name').textContent = unit.opts.label;
+  const tag = document.getElementById('ic-faction');
+  tag.textContent = f.name;
+  tag.style.background = '#' + f.dark.toString(16).padStart(6,'0');
+  document.getElementById('ic-role').textContent = unit.opts.info.role;
+  document.getElementById('ic-strength').textContent = unit.opts.info.strength;
+  document.getElementById('ic-status').textContent = unit.status;
+  document.getElementById('ic-desc').textContent = unit.opts.info.desc;
+  infoCard.classList.add('visible');
+  const x = Math.min(innerWidth - 290, (ev?.clientX ?? innerWidth/2) + 14);
+  const y = Math.min(innerHeight - 260, (ev?.clientY ?? innerHeight/2) - 30);
+  infoCard.style.left = x + 'px'; infoCard.style.top = y + 'px';
+}
+document.getElementById('info-close').addEventListener('click',
+  () => infoCard.classList.remove('visible'));
+
+/* raycast click on soldiers */
+const raycaster = new THREE.Raycaster();
+const mouseV = new THREE.Vector2();
+let downXY = null;
+renderer.domElement.addEventListener('pointerdown', e => { downXY = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if(!downXY || Math.hypot(e.clientX - downXY[0], e.clientY - downXY[1]) > 6) return; // a drag, not a click
+  mouseV.set((e.clientX/innerWidth)*2 - 1, -(e.clientY/innerHeight)*2 + 1);
+  raycaster.setFromCamera(mouseV, camera);
+  const hits = raycaster.intersectObjects(clickables, false);
+  const hit = hits.find(h => h.object.userData.unit && h.object.parent.visible);
+  if(hit) showInfoCard(hit.object.userData.unit, e);
+  else infoCard.classList.remove('visible');
+});
 
 /* =====================================================================
    SECTION 6 : EFFECTS  (filled in build stage 3)
