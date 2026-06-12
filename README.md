@@ -1,12 +1,13 @@
 # Interactive 3D Battle Documentaries
 
-Two single-file Three.js battle reconstructions, styled as TV history
+Three single-file Three.js battle reconstructions, styled as TV history
 specials. No build step — each battle is one HTML file with CDN imports.
 
 | Battle | Live demo |
 |---|---|
 | ⚔ The Battle of Alesia — 52 BCE | https://yitachen.github.io/battle-of-alesia-3d/ |
 | 🇺🇸⚜ The Siege of Yorktown — 1781 | https://yitachen.github.io/battle-of-alesia-3d/yorktown.html |
+| 🔥🌊 The Battle of Red Cliffs — 208 CE | https://yitachen.github.io/battle-of-alesia-3d/redcliffs.html |
 
 ---
 
@@ -111,3 +112,43 @@ Controls are identical to Alesia (see table above). Figures are marked
 **approximate / estimated**; the geography is stylized but preserves the
 strategic structure: the army pinned against the river, the allies in a
 land arc, the fleet closing the sea.
+
+---
+
+# The Battle of Red Cliffs — 208 CE
+
+**Live demo: https://yitachen.github.io/battle-of-alesia-3d/redcliffs.html**
+
+![Act 5 — the fire attack: Huang Gai's fire ships run before the east wind toward Cao Cao's chained fleet on the night Yangtze](docs/screenshot-redcliffs.png)
+
+The naval battle that fixed the Three Kingdoms (`redcliffs.html`, same
+single-file / CDN approach). Cao Cao's northern armada anchors on the
+Yangtze off Wulin; the outnumbered Sun-Liu alliance answers with a chained
+enemy fleet, a false surrender, an east wind — and fire.
+
+## Features
+
+- **3D Yangtze battlefield** — the river, the reddish Red Cliffs bluff,
+  Wulin and Cao Cao's north-bank camp, the allied anchorage downstream,
+  the Huarong retreat road; all key locations labelled
+- **Three factions** with flags, leader labels and clickable info cards:
+  Cao Cao (blue), Sun Quan / Zhou Yu / Huang Gai (red),
+  Liu Bei / Zhuge Liang (green) — alliance grouping shown in the legend
+- **The chained fleet** — a 6×4 grid of warships visibly linked hull-to-hull
+  with chains and boarding planks
+- **Ship damage state machine** — every warship transitions
+  Normal → Ignited → Burning → Charred → Destroyed with charring hulls,
+  burning sails, collapsing masts, listing wrecks; click any ship to see
+  its current state
+- **Chain-reaction fire attack** — fire ships run before the wind, and the
+  blaze spreads outward through the linked grid; a Fire Spread bar tracks it
+- **The east wind** — a particle stream over the river, a pulsing wind chip,
+  map arrows and an Eastern Wind status bar (the altar scene is flagged as a
+  *Romance of the Three Kingdoms* dramatization)
+- **Seven-act timeline** from the southern march to the Three Kingdoms
+  aftermath, with a colour-coded victory banner (red + green allies defeat
+  blue)
+
+Controls are identical to the other battles. Figures are marked
+**approximate / estimated**; dramatized elements (Huang Gai's ruse,
+"borrowing the east wind") are labelled as such in the UI.
