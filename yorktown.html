@@ -1,0 +1,1977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Siege of Yorktown — 1781 | Interactive 3D Battle Documentary</title>
+<style>
+  /* ==================== UI : GLOBAL ==================== */
+  :root{
+    --usa:#2563eb; --usa-dark:#1e40af;
+    --fra:#e7cf8a; --fra-dark:#a8862e;
+    --nav:#8b5cf6; --nav-dark:#5b21b6;
+    --gbr:#dc2626; --gbr-dark:#991b1b;
+    --panel:rgba(12,14,20,0.82);
+    --panel-border:rgba(255,255,255,0.14);
+    --gold:#d8b25c;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:100%;height:100%;overflow:hidden;background:#0a0c10;
+    font-family:"Segoe UI",Helvetica,Arial,sans-serif;color:#e8e6e0;}
+  #scene-container{position:fixed;inset:0;}
+  canvas{display:block;}
+
+  .letterbox{position:fixed;left:0;right:0;height:0;background:#000;z-index:5;
+    transition:height 1.2s ease;pointer-events:none;}
+  #letterbox-top{top:0;} #letterbox-bottom{bottom:0;}
+  body.cinematic #letterbox-top{height:46px;} body.cinematic #letterbox-bottom{height:46px;}
+  #vignette{position:fixed;inset:0;pointer-events:none;z-index:4;
+    background:radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.45) 100%);}
+
+  /* ==================== UI : TITLE ==================== */
+  #title-block{position:fixed;top:18px;left:22px;z-index:10;max-width:430px;
+    text-shadow:0 2px 8px rgba(0,0,0,0.9);pointer-events:none;}
+  #title-block h1{font-family:Georgia,"Times New Roman",serif;font-size:26px;
+    letter-spacing:3px;color:var(--gold);text-transform:uppercase;}
+  #title-block h2{font-size:13px;font-weight:400;letter-spacing:2px;color:#cfc9bb;margin-top:2px;}
+  #title-block p{font-size:11.5px;color:#b8b2a4;margin-top:6px;line-height:1.45;}
+
+  /* ==================== UI : LEGEND ==================== */
+  #legend{position:fixed;top:18px;right:22px;z-index:10;background:var(--panel);
+    border:1px solid var(--panel-border);border-radius:8px;padding:10px 14px;
+    font-size:11.5px;backdrop-filter:blur(6px);min-width:230px;}
+  #legend h3{font-size:11px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;
+    margin-bottom:7px;border-bottom:1px solid var(--panel-border);padding-bottom:5px;}
+  .legend-row{display:flex;align-items:center;gap:8px;margin:4px 0;}
+  .swatch{width:13px;height:13px;border-radius:3px;flex:0 0 auto;box-shadow:0 0 6px rgba(0,0,0,0.5);}
+  .line-swatch{width:22px;height:0;border-top:3px solid;flex:0 0 auto;}
+  .dashed{border-top-style:dashed !important;}
+
+  /* ==================== UI : ACT PANEL ==================== */
+  #act-panel{position:fixed;left:22px;bottom:118px;z-index:10;max-width:440px;
+    background:var(--panel);border:1px solid var(--panel-border);border-left:3px solid var(--gold);
+    border-radius:8px;padding:13px 16px;backdrop-filter:blur(6px);transition:opacity .5s;}
+  #act-label{font-size:10.5px;letter-spacing:2.5px;color:var(--gold);text-transform:uppercase;}
+  #act-title{font-family:Georgia,serif;font-size:18px;margin:3px 0 6px;}
+  #act-desc{font-size:12px;line-height:1.5;color:#cfc9bd;}
+  #act-event{font-size:11px;margin-top:8px;color:#ffd9a0;min-height:14px;}
+  #act-event::before{content:"⚑ ";}
+  #act-event:empty{display:none;}
+
+  /* ==================== UI : STATUS BARS ==================== */
+  #status-panel{position:fixed;right:22px;bottom:118px;z-index:10;width:235px;
+    background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;
+    padding:11px 14px;backdrop-filter:blur(6px);font-size:11px;}
+  #status-panel h3{font-size:10.5px;letter-spacing:2px;color:var(--gold);
+    text-transform:uppercase;margin-bottom:8px;}
+  .bar-row{margin:7px 0;}
+  .bar-row label{display:flex;justify-content:space-between;margin-bottom:3px;color:#cfc9bd;}
+  .bar-track{height:7px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;}
+  .bar-fill{height:100%;border-radius:4px;transition:width 1.4s ease;}
+  #status-note{font-size:9.5px;color:#8d887c;margin-top:8px;font-style:italic;}
+
+  /* ==================== UI : TIMELINE & CONTROLS ==================== */
+  #control-deck{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:11;
+    background:var(--panel);border:1px solid var(--panel-border);border-radius:12px;
+    padding:10px 16px;backdrop-filter:blur(8px);width:min(960px,96vw);}
+  #timeline{display:flex;gap:5px;margin-bottom:9px;}
+  .act-btn{flex:1;background:rgba(255,255,255,0.06);border:1px solid var(--panel-border);
+    color:#bdb7aa;font-size:10px;padding:7px 3px;border-radius:6px;cursor:pointer;
+    text-align:center;transition:all .25s;line-height:1.3;}
+  .act-btn .num{display:block;font-size:9px;letter-spacing:1.5px;color:#8d887c;}
+  .act-btn:hover{background:rgba(255,255,255,0.14);color:#fff;}
+  .act-btn.active{background:rgba(216,178,92,0.22);border-color:var(--gold);color:#ffe9bb;}
+  .act-btn.active .num{color:var(--gold);}
+  #transport{display:flex;align-items:center;gap:8px;justify-content:center;}
+  .ctl-btn{background:rgba(255,255,255,0.08);border:1px solid var(--panel-border);
+    color:#e8e6e0;font-size:12px;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all .2s;}
+  .ctl-btn:hover{background:rgba(255,255,255,0.18);}
+  .ctl-btn.toggled{background:rgba(216,178,92,0.25);border-color:var(--gold);color:#ffe9bb;}
+  .speed-group{display:flex;gap:3px;}
+  .speed-btn{padding:6px 8px;font-size:11px;}
+  #act-progress{flex:1;height:5px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;max-width:240px;}
+  #act-progress-fill{height:100%;width:0%;background:var(--gold);transition:width .3s linear;}
+
+  /* victory banner (end of Act 7) */
+  #victory-banner{position:fixed;left:50%;top:24%;transform:translate(-50%,-50%) scale(0.92);
+    z-index:30;text-align:center;background:rgba(10,12,18,0.88);border:2px solid var(--gold);
+    border-radius:10px;padding:22px 46px;opacity:0;pointer-events:none;
+    transition:opacity 1.4s ease, transform 1.4s ease;backdrop-filter:blur(8px);
+    box-shadow:0 0 60px rgba(216,178,92,0.25);}
+  #victory-banner.visible{opacity:1;transform:translate(-50%,-50%) scale(1);}
+  #victory-banner .laurel{font-size:30px;}
+  #victory-banner h2{font-family:Georgia,serif;font-size:30px;letter-spacing:5px;
+    color:var(--gold);text-transform:uppercase;margin:6px 0 4px;}
+  #victory-banner p{font-size:13px;color:#cfc9bd;letter-spacing:1px;}
+  #victory-banner .sub{font-size:11px;color:#8d887c;margin-top:6px;}
+
+  /* ==================== UI : INFO CARD ==================== */
+  #info-card{position:fixed;z-index:20;width:270px;background:rgba(10,12,18,0.94);
+    border:1px solid var(--gold);border-radius:9px;padding:13px 15px;display:none;
+    box-shadow:0 8px 30px rgba(0,0,0,0.7);font-size:12px;backdrop-filter:blur(8px);}
+  #info-card.visible{display:block;}
+  #info-card h3{font-family:Georgia,serif;font-size:16px;margin-bottom:2px;}
+  #info-card .faction-tag{display:inline-block;font-size:9.5px;letter-spacing:1.5px;
+    text-transform:uppercase;padding:2px 7px;border-radius:4px;margin:4px 0 7px;}
+  #info-card p{line-height:1.45;color:#cfc9bd;}
+  #info-card .stat{display:flex;justify-content:space-between;margin:3px 0;color:#bdb7aa;font-size:11px;}
+  #info-card .close-x{position:absolute;top:7px;right:11px;cursor:pointer;color:#8d887c;font-size:14px;}
+  #info-card .close-x:hover{color:#fff;}
+
+  /* ==================== 3D LABELS (CSS2D) ==================== */
+  .map-label{font-size:11px;letter-spacing:1.5px;color:#f0ead9;text-transform:uppercase;
+    text-shadow:0 1px 4px #000,0 0 10px rgba(0,0,0,0.9);pointer-events:none;white-space:nowrap;
+    font-family:Georgia,serif;}
+  .map-label.minor{font-size:9.5px;color:#cdc6b4;letter-spacing:1px;}
+  .map-label.water{color:#a8c8e8;font-style:italic;}
+  .unit-label{font-size:10px;padding:2px 8px;border-radius:4px;white-space:nowrap;cursor:pointer;
+    pointer-events:auto;background:rgba(8,10,14,0.78);border:1px solid;letter-spacing:0.5px;
+    text-shadow:0 1px 2px #000;transition:transform .15s;}
+  .unit-label:hover{transform:scale(1.12);}
+  .unit-label.usa{border-color:var(--usa);color:#bcd6ff;}
+  .unit-label.fra{border-color:var(--fra);color:#f3e7bd;}
+  .unit-label.nav{border-color:var(--nav);color:#d8c6ff;}
+  .unit-label.gbr{border-color:var(--gbr);color:#ffc4c4;}
+
+  /* loading screen */
+  #loader{position:fixed;inset:0;background:#0a0c10;z-index:100;display:flex;
+    flex-direction:column;align-items:center;justify-content:center;gap:14px;
+    transition:opacity .8s;}
+  #loader.done{opacity:0;pointer-events:none;}
+  #loader h1{font-family:Georgia,serif;letter-spacing:4px;color:var(--gold);font-size:30px;}
+  #loader p{color:#8d887c;font-size:12px;letter-spacing:2px;}
+
+  @media (max-width:900px){
+    #title-block{max-width:300px;} #title-block h1{font-size:19px;}
+    #title-block p{display:none;}
+    #legend{display:none;}
+    #act-panel{max-width:300px;bottom:132px;}
+    #status-panel{display:none;}
+    .act-btn{font-size:8.5px;}
+  }
+</style>
+</head>
+<body>
+
+<div id="scene-container"></div>
+<div id="vignette"></div>
+<div class="letterbox" id="letterbox-top"></div>
+<div class="letterbox" id="letterbox-bottom"></div>
+
+<!-- ==================== LOADING ==================== -->
+<div id="loader">
+  <h1>YORKTOWN</h1>
+  <p>1781 &mdash; RECONSTRUCTING THE SIEGE&hellip;</p>
+</div>
+
+<!-- ==================== TITLE ==================== -->
+<div id="title-block">
+  <h1>The Siege of Yorktown</h1>
+  <h2>SEP&ndash;OCT 1781 &mdash; VIRGINIA &mdash; WASHINGTON &amp; ROCHAMBEAU vs. CORNWALLIS</h2>
+  <p>Trapped on the York peninsula, Lord Cornwallis is sealed off by land by the
+     American&ndash;French allied army and by sea by Admiral de Grasse&rsquo;s French fleet.
+     With no relief and no escape, the siege ends in the surrender that decides
+     the American War of Independence.</p>
+</div>
+
+<!-- ==================== LEGEND ==================== -->
+<div id="legend">
+  <h3>Forces &amp; Lines</h3>
+  <div class="legend-row"><span class="swatch" style="background:var(--usa)"></span>Continental Army — Washington</div>
+  <div class="legend-row"><span class="swatch" style="background:var(--fra)"></span>French Army — Rochambeau</div>
+  <div class="legend-row"><span class="swatch" style="background:var(--nav)"></span>French Navy — de Grasse</div>
+  <div class="legend-row"><span class="swatch" style="background:var(--gbr)"></span>British Army — Cornwallis</div>
+  <div class="legend-row"><span class="line-swatch" style="border-color:var(--gbr)"></span>British Defensive Line</div>
+  <div class="legend-row"><span class="line-swatch" style="border-color:var(--gold)"></span>Allied Siege Parallels</div>
+  <div class="legend-row"><span class="line-swatch dashed" style="border-color:var(--nav)"></span>French Naval Blockade</div>
+</div>
+
+<!-- ==================== ACT PANEL ==================== -->
+<div id="act-panel">
+  <div id="act-label">Prologue</div>
+  <div id="act-title">The Road to Yorktown</div>
+  <div id="act-desc">August 1781. Ordered to hold a deep-water port, Cornwallis digs in
+    at Yorktown on the York River — unaware that army and fleet are already converging on him.</div>
+  <div id="act-event"></div>
+</div>
+
+<!-- ==================== STATUS BARS ==================== -->
+<div id="status-panel">
+  <h3>Siege Status</h3>
+  <div class="bar-row"><label><span>British Supplies</span><span id="v-supplies"></span></label>
+    <div class="bar-track"><div class="bar-fill" id="b-supplies" style="background:#e2a23b;width:85%"></div></div></div>
+  <div class="bar-row"><label><span>British Morale</span><span id="v-morale"></span></label>
+    <div class="bar-track"><div class="bar-fill" id="b-morale" style="background:var(--gbr);width:90%"></div></div></div>
+  <div class="bar-row"><label><span>Allied Artillery Pressure</span><span id="v-artillery"></span></label>
+    <div class="bar-track"><div class="bar-fill" id="b-artillery" style="background:var(--usa);width:0%"></div></div></div>
+  <div class="bar-row"><label><span>Naval Blockade</span><span id="v-blockade"></span></label>
+    <div class="bar-track"><div class="bar-fill" id="b-blockade" style="background:var(--nav);width:0%"></div></div></div>
+  <div id="status-note">All figures approximate / estimated from period sources.</div>
+</div>
+
+<!-- ==================== TIMELINE / CONTROLS ==================== -->
+<div id="control-deck">
+  <div id="timeline"></div>
+  <div id="transport">
+    <button class="ctl-btn" id="btn-prev" title="Previous act">⏮ Prev</button>
+    <button class="ctl-btn" id="btn-play" title="Auto play">▶ Auto Play</button>
+    <button class="ctl-btn" id="btn-next" title="Next act">Next ⏭</button>
+    <div class="speed-group" title="Playback speed">
+      <button class="ctl-btn speed-btn" data-speed="1">1×</button>
+      <button class="ctl-btn speed-btn" data-speed="2">2×</button>
+      <button class="ctl-btn speed-btn" data-speed="3">3×</button>
+      <button class="ctl-btn speed-btn" data-speed="4">4×</button>
+    </div>
+    <div id="act-progress"><div id="act-progress-fill"></div></div>
+    <button class="ctl-btn toggled" id="btn-camera" title="Toggle camera mode">🎬 Cinematic Camera</button>
+  </div>
+</div>
+
+<!-- ==================== VICTORY BANNER ==================== -->
+<div id="victory-banner">
+  <div class="laurel">🇺🇸 ⚜ 🇫🇷</div>
+  <h2>Allied Victory</h2>
+  <p>Cornwallis surrenders ~8,000 men (estimated)</p>
+  <div class="sub">"The World Turned Upside Down" — the decisive end of the War of Independence</div>
+</div>
+
+<!-- ==================== INFO CARD ==================== -->
+<div id="info-card">
+  <span class="close-x" id="info-close">✕</span>
+  <h3 id="ic-name"></h3>
+  <span class="faction-tag" id="ic-faction"></span>
+  <div class="stat"><span>Role</span><span id="ic-role"></span></div>
+  <div class="stat"><span>Strength</span><span id="ic-strength"></span></div>
+  <div class="stat"><span>Status</span><span id="ic-status"></span></div>
+  <p id="ic-desc" style="margin-top:7px"></p>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+/* =====================================================================
+   SECTION 1 : SCENE SETUP
+   ===================================================================== */
+const container = document.getElementById('scene-container');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9db8cc);
+scene.fog = new THREE.Fog(0x9db8cc, 800, 2200);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 1, 6000);
+camera.position.set(700, 800, 900);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+container.appendChild(renderer.domElement);
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(innerWidth, innerHeight);
+labelRenderer.domElement.style.position = 'fixed';
+labelRenderer.domElement.style.top = '0';
+labelRenderer.domElement.style.pointerEvents = 'none';
+labelRenderer.domElement.style.zIndex = '3';
+document.body.appendChild(labelRenderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 10, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.maxPolarAngle = Math.PI * 0.49;
+controls.minDistance = 60;
+controls.maxDistance = 1900;
+
+/* --- lighting (coastal autumn light; mood shifts per act) --- */
+const hemi = new THREE.HemisphereLight(0xd6e6f5, 0x4a4434, 0.85);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff3da, 1.55);
+sun.position.set(-420, 600, 320);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -600; sun.shadow.camera.right = 600;
+sun.shadow.camera.top = 600;  sun.shadow.camera.bottom = -600;
+sun.shadow.camera.far = 1900;
+sun.shadow.bias = -0.0004;
+scene.add(sun);
+
+const lighting = {
+  sky: new THREE.Color(0x9db8cc), sunColor: new THREE.Color(0xfff3da),
+  sunIntensity: 1.55, hemiIntensity: 0.85,
+  targetSky: new THREE.Color(0x9db8cc), targetSunColor: new THREE.Color(0xfff3da),
+  targetSunIntensity: 1.55, targetHemiIntensity: 0.85
+};
+function setMood(skyHex, sunHex, sunI, hemiI){
+  lighting.targetSky.set(skyHex); lighting.targetSunColor.set(sunHex);
+  lighting.targetSunIntensity = sunI; lighting.targetHemiIntensity = hemiI;
+}
+
+const updateHooks = [];
+const clock = new THREE.Clock();
+
+/* simulation clock: pause freezes EVERYTHING (progress, troops, ships,
+   effects, cinematic camera); speed scales the whole show (1x-4x).
+   The free camera itself stays interactive while paused. */
+let playing = true;
+let simSpeed = 1;
+let simT = 0;
+
+/* =====================================================================
+   SECTION 2 : TERRAIN & WATER
+   Coastal Virginia, stylized for legibility:
+   - York River flows W->E across the upper map and opens eastward
+     into Chesapeake Bay (the whole east edge is open water).
+   - Yorktown sits on a low bluff on the SOUTH bank; Gloucester Point
+     juts from the NORTH bank directly opposite.
+   - The land south of town is the flat, open siege ground.
+   ===================================================================== */
+const WORLD = 1600;
+const TOWN = { x: 0, z: -55 };          // Yorktown bluff
+const RIVER_Z = -150;                    // river centreline
+function smoothstep(a, b, x){ x = Math.min(1, Math.max(0, (x-a)/(b-a))); return x*x*(3-2*x); }
+
+function riverCenter(x){ return RIVER_Z + Math.sin(x * 0.0028) * 28; }
+function riverHalfW(x){ return 54 + 300 * smoothstep(260, 620, x); }   // widens into the bay
+
+function terrainHeight(x, z){
+  let h = 7 + 2.0 * Math.sin(x*0.010) * Math.cos(z*0.012)
+        + 1.1 * Math.sin(x*0.027 + 1) * Math.cos(z*0.023 + 2);
+  // low bluff under Yorktown and gentle rise inland (south)
+  const dT = Math.hypot(x - TOWN.x, z - TOWN.z);
+  h += 7 * Math.exp(-(dT*dT) / (2*150*150));
+  h += 3 * smoothstep(50, 420, z);
+  // Gloucester Point: slight knoll on the north bank
+  const dG = Math.hypot(x - 30, z + 265);
+  h += 4 * Math.exp(-(dG*dG) / (2*90*90));
+  // marshy creek mouths flanking the town (Yorktown & Wormley creeks)
+  const dC1 = Math.hypot(x + 200, z + 60), dC2 = Math.hypot(x - 235, z + 35);
+  h -= 5 * Math.exp(-(dC1*dC1) / (2*55*55));
+  h -= 5 * Math.exp(-(dC2*dC2) / (2*50*50));
+  // the York River channel
+  const d = Math.abs(z - riverCenter(x));
+  const hw = riverHalfW(x);
+  const wRiver = 1 - smoothstep(hw*0.78, hw*1.22, d);
+  h = h * (1 - wRiver) + (-9) * wRiver;
+  // Chesapeake Bay: everything far east is open water
+  const wBay = smoothstep(520, 640, x);
+  h = h * (1 - wBay) + (-11) * wBay;
+  return h;
+}
+
+const terrainGeo = new THREE.PlaneGeometry(WORLD, WORLD, 250, 250);
+terrainGeo.rotateX(-Math.PI/2);
+{
+  const pos = terrainGeo.attributes.position;
+  const colors = [];
+  const cGrass  = new THREE.Color(0x7a9255);
+  const cGrass2 = new THREE.Color(0x93a863);
+  const cField  = new THREE.Color(0xa8a26a);
+  const cSand   = new THREE.Color(0xc2b287);
+  const cMud    = new THREE.Color(0x6b6a4e);
+  for(let i=0;i<pos.count;i++){
+    const x = pos.getX(i), z = pos.getZ(i);
+    const h = terrainHeight(x, z);
+    pos.setY(i, h);
+    const c = new THREE.Color();
+    const n = Math.sin(x*0.045)*Math.cos(z*0.06)*0.5+0.5;
+    if(h < 0.6) c.copy(cMud);
+    else if(h < 2.6) c.copy(cSand);                       // shoreline
+    else if(h < 9) c.lerpColors(cGrass, cGrass2, n);
+    else c.lerpColors(cGrass2, cField, smoothstep(9, 16, h));
+    // farmed-field patchwork on the siege plain south of town
+    if(z > 60 && z < 420 && Math.abs(x) < 420){
+      const fx = Math.floor((x + 1000) / 70), fz = Math.floor((z + 1000) / 55);
+      if((fx + fz) % 3 === 0) c.lerp(new THREE.Color(0xb3a05f), 0.3);
+      if((fx * 7 + fz) % 5 === 0) c.lerp(new THREE.Color(0x6e8a4d), 0.25);
+    }
+    colors.push(c.r, c.g, c.b);
+  }
+  terrainGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  terrainGeo.computeVertexNormals();
+}
+const terrain = new THREE.Mesh(terrainGeo,
+  new THREE.MeshStandardMaterial({ vertexColors:true, roughness:0.95, metalness:0 }));
+terrain.receiveShadow = true;
+scene.add(terrain);
+
+function groundY(x, z){ return terrainHeight(x, z); }
+
+/* --- the water surface (river + bay), gently rippling --- */
+const waterGeo = new THREE.PlaneGeometry(WORLD, WORLD, 110, 110);
+waterGeo.rotateX(-Math.PI/2);
+const waterBase = waterGeo.attributes.position.array.slice();
+const water = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({
+  color:0x3a6a8e, roughness:0.65, metalness:0.08, transparent:true, opacity:0.92 }));
+water.position.y = 0.0;
+scene.add(water);
+updateHooks.push((dt, t) => {
+  const p = waterGeo.attributes.position;
+  for(let i = 0; i < p.count; i += 1){
+    const x = waterBase[i*3], z = waterBase[i*3+2];
+    p.setY(i, Math.sin(x*0.02 + t*0.9) * 0.35 + Math.cos(z*0.024 + t*0.7) * 0.3);
+  }
+  p.needsUpdate = true;
+});
+
+/* --- scattered trees: woods inland, clear siege ground --- */
+{
+  const trunkG = new THREE.CylinderGeometry(0.5, 0.7, 4, 5);
+  const crownG = new THREE.ConeGeometry(3.4, 9, 6);
+  const trunkM = new THREE.MeshStandardMaterial({ color:0x5d4a33, roughness:1 });
+  const crownM = new THREE.MeshStandardMaterial({ color:0x47633a, roughness:1 });
+  const N = 400;
+  const trunks = new THREE.InstancedMesh(trunkG, trunkM, N);
+  const crowns = new THREE.InstancedMesh(crownG, crownM, N);
+  const dummy = new THREE.Object3D();
+  let placed = 0, guard = 0;
+  let seed = 11; const rnd = () => (seed = (seed*16807)%2147483647) / 2147483647;
+  while(placed < N && guard++ < 8000){
+    const x = (rnd()-0.5)*WORLD*0.92, z = (rnd()-0.5)*WORLD*0.92;
+    const h = terrainHeight(x, z);
+    if(h < 3.5) continue;                                   // no trees in water/marsh
+    const dT = Math.hypot(x - TOWN.x, z - TOWN.z);
+    if(dT < 290 && z > -110) continue;                      // keep the siege ground clear
+    if(Math.hypot(x - 30, z + 265) < 80) continue;          // keep Gloucester clear
+    const s = 0.7 + rnd()*0.9;
+    dummy.position.set(x, h+2*s, z); dummy.scale.setScalar(s); dummy.rotation.y = rnd()*6.28;
+    dummy.updateMatrix(); trunks.setMatrixAt(placed, dummy.matrix);
+    dummy.position.y = h + 7.6*s; dummy.updateMatrix();
+    crowns.setMatrixAt(placed, dummy.matrix);
+    placed++;
+  }
+  trunks.count = crowns.count = placed;
+  trunks.castShadow = crowns.castShadow = true;
+  scene.add(trunks, crowns);
+}
+
+/* =====================================================================
+   SECTION 3 : MAP LABELS
+   ===================================================================== */
+function addMapLabel(text, x, z, yOff = 8, cls = ''){
+  const div = document.createElement('div');
+  div.className = 'map-label' + (cls ? ' ' + cls : '');
+  div.textContent = text;
+  const obj = new CSS2DObject(div);
+  obj.position.set(x, Math.max(groundY(x, z), 0) + yOff, z);
+  scene.add(obj);
+  return obj;
+}
+addMapLabel('YORKTOWN', TOWN.x, TOWN.z, 30);
+addMapLabel('Gloucester Point', 30, -265, 16, 'minor');
+addMapLabel('York River', -330, -155, 7, 'minor water');
+addMapLabel('Chesapeake Bay', 640, -10, 8, 'water');
+addMapLabel('to Williamsburg →', -620, 150, 9, 'minor');
+addMapLabel('Surrender Field', -95, 215, 7, 'minor');
+const lblBrit   = addMapLabel('British Defensive Line', -45, 85, 11, 'minor');
+const lblP1     = addMapLabel('First Parallel', 35, 215, 11, 'minor');
+const lblP2     = addMapLabel('Second Parallel', 55, 118, 11, 'minor');
+const lblFleet  = addMapLabel('French Fleet — Naval Blockade', 600, 130, 16, 'minor water');
+const lblCampUS = addMapLabel('American Camp', 200, 330, 12, 'minor');
+const lblCampFR = addMapLabel('French Camp', -240, 300, 12, 'minor');
+const lblR9     = addMapLabel('Redoubt 9', 178, -8, 12, 'minor');
+const lblR10    = addMapLabel('Redoubt 10', 152, -78, 12, 'minor');
+[lblBrit, lblP1, lblP2, lblFleet, lblCampUS, lblCampFR].forEach(l => l.visible = false);
+
+/* =====================================================================
+   SECTION 4 : FORTIFICATIONS
+   - British defensive arc around Yorktown (earthworks + abatis),
+     with detached Redoubts 9 & 10 anchoring its eastern flank.
+   - Allied siege parallels (First & Second) dug progressively as
+     trench + gabion arcs, with siege batteries.
+   - Small British works at Gloucester Point across the river.
+   ===================================================================== */
+const earthMat  = new THREE.MeshStandardMaterial({ color:0x7d6c4a, roughness:1 });
+const earthDark = new THREE.MeshStandardMaterial({ color:0x55482f, roughness:1 });
+const gabionMat = new THREE.MeshStandardMaterial({ color:0x8a7448, roughness:0.95 });
+const stakeMat  = new THREE.MeshStandardMaterial({ color:0x4a3520, roughness:1 });
+
+/* generic progressive arc of fortification segments around a centre.
+   kind: 'rampart' (British earthwork+abatis) or 'trench' (allied parallel) */
+function buildArcWorks(cx, cz, radius, a0, a1, segCount, kind){
+  const group = new THREE.Group();
+  const segments = [];
+  const wallG   = new THREE.BoxGeometry(1, 5.2, 1);
+  const parapetG= new THREE.BoxGeometry(1, 2.6, 1);
+  const gabionG = new THREE.CylinderGeometry(1.5, 1.7, 3.4, 7);
+  const stakeG  = new THREE.ConeGeometry(0.7, 4, 5);
+  for(let i = 0; i < segCount; i++){
+    const aa = a0 + (i / segCount) * (a1 - a0);
+    const ab = a0 + ((i + 1) / segCount) * (a1 - a0);
+    const am = (aa + ab) / 2;
+    const x = cx + Math.cos(am) * radius, z = cz + Math.sin(am) * radius;
+    const y = groundY(x, z);
+    const segLen = radius * Math.abs(ab - aa) * 1.06;
+    const seg = new THREE.Group();
+    seg.position.set(x, y, z);
+    seg.rotation.y = -am;
+    if(kind === 'rampart'){
+      const wall = new THREE.Mesh(wallG, earthMat);
+      wall.scale.set(4.5, 1, segLen);
+      wall.position.y = 2.4; wall.castShadow = true;
+      seg.add(wall);
+      // abatis: sharpened stakes facing the besiegers (outward from town)
+      if(i % 2 === 0){
+        for(let s = 0; s < 4; s++){
+          const st = new THREE.Mesh(stakeG, stakeMat);
+          st.position.set(7 + (s % 2) * 3, 1.4, (s - 1.5) * segLen / 4.5);
+          st.rotation.z = -0.75;
+          seg.add(st);
+        }
+      }
+    } else {
+      // allied trench: dark cut + gabion parapet on the town-facing side
+      const cut = new THREE.Mesh(wallG, earthDark);
+      cut.scale.set(6, 0.25, segLen);
+      cut.position.y = 0.5;
+      seg.add(cut);
+      const para = new THREE.Mesh(parapetG, earthMat);
+      para.scale.set(2.6, 1, segLen);
+      para.position.set(-4.4, 1.3, 0);   // -x in seg space points toward the centre (town)
+      para.castShadow = true;
+      seg.add(para);
+      const nG = Math.max(2, Math.round(segLen / 7));
+      for(let g = 0; g < nG; g++){
+        const gb = new THREE.Mesh(gabionG, gabionMat);
+        gb.position.set(-4.4, 3.2, (g - (nG-1)/2) * (segLen / nG));
+        gb.castShadow = true;
+        seg.add(gb);
+      }
+    }
+    seg.visible = false;
+    group.add(seg);
+    segments.push(seg);
+  }
+  scene.add(group);
+  return { group, segments, progress: 0, target: 0 };
+}
+
+/* broadcast-graphics arc overlays (read the siege structure from the air) */
+function buildArcOverlay(cx, cz, radius, a0, a1, colorHex, dashed, onWater){
+  const group = new THREE.Group();
+  const arcs = dashed ? 30 : 1;
+  const mat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true,
+    opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+  const span = (a1 - a0) / arcs;
+  for(let i = 0; i < arcs; i++){
+    const geo = new THREE.RingGeometry(radius - 2.6, radius + 2.6, dashed ? 8 : 140, 1,
+      a0 + i * span, dashed ? span * 0.55 : (a1 - a0));
+    geo.rotateX(-Math.PI / 2);
+    const p = geo.attributes.position;
+    for(let j = 0; j < p.count; j++){
+      const px = cx + p.getX(j), pz = cz + p.getZ(j);
+      p.setX(j, px); p.setZ(j, pz);
+      p.setY(j, onWater ? 1.4 : Math.max(groundY(px, pz), 0) + 1.6);
+    }
+    group.add(new THREE.Mesh(geo, mat));
+  }
+  scene.add(group);
+  return { group, mat };
+}
+
+/* British line: arc on the landward side of Yorktown, bank to bank */
+const A0 = -0.22, A1 = Math.PI + 0.30;     // a=0 east, a=PI west, sin>0 = south (inland)
+const britLine    = buildArcWorks(TOWN.x, TOWN.z, 108, A0, A1, 46, 'rampart');
+const britOverlay = buildArcOverlay(TOWN.x, TOWN.z, 108, A0, A1, 0xff5a5a, false, false);
+
+/* Allied parallels (dug in Acts 4 & 5). The first runs wide; the second
+   presses close. Their eastern ends stop short of Redoubts 9 & 10. */
+const par1        = buildArcWorks(TOWN.x, TOWN.z, 242, 0.34, Math.PI * 0.82, 40, 'trench');
+const par1Overlay = buildArcOverlay(TOWN.x, TOWN.z, 242, 0.34, Math.PI * 0.82, 0xe8c060, false, false);
+const par2        = buildArcWorks(TOWN.x, TOWN.z, 152, 0.40, Math.PI * 0.78, 34, 'trench');
+const par2Overlay = buildArcOverlay(TOWN.x, TOWN.z, 152, 0.40, Math.PI * 0.78, 0xffd97a, false, false);
+
+const LINES = [
+  [britLine, britOverlay, lblBrit, 0.45],
+  [par1, par1Overlay, lblP1, 0.5],
+  [par2, par2Overlay, lblP2, 0.5],
+];
+function setLineTarget(line, t){ line.target = t; }
+function applyLineVisuals([line, overlay, lbl, opMax]){
+  const n = line.segments.length;
+  line.segments.forEach((seg, i) => {
+    const segP = Math.min(1, Math.max(0, line.progress * n - i));
+    seg.visible = segP > 0.02;
+    seg.scale.y = Math.max(0.02, segP);
+  });
+  overlay.mat.opacity = line.progress * opMax;
+  lbl.visible = line.progress > 0.35;
+}
+updateHooks.push((dt) => {
+  for(const entry of LINES){
+    const line = entry[0];
+    if(Math.abs(line.progress - line.target) < 0.001) continue;
+    line.progress += Math.sign(line.target - line.progress) * dt * 0.10;
+    line.progress = Math.min(1, Math.max(0, line.progress));
+    applyLineVisuals(entry);
+  }
+});
+function finishLinesInstantly(){
+  for(const entry of LINES){ entry[0].progress = entry[0].target; applyLineVisuals(entry); }
+}
+
+/* naval blockade overlay: dashed purple arc sealing the river mouth */
+const blockadeOverlay = buildArcOverlay(620, -60, 230, -Math.PI*0.75, Math.PI*0.78, 0x9b6bff, true, true);
+function setBlockade(v){ blockadeOverlay.mat.opacity = v ? 0.55 : 0; lblFleet.visible = v; }
+
+/* ---------- Redoubts 9 & 10: detached square earthworks ---------- */
+function buildRedoubt(x, z, size, lbl){
+  const g = new THREE.Group();
+  const y = groundY(x, z);
+  g.position.set(x, y, z);
+  const wallG = new THREE.BoxGeometry(size, 4.6, 3);
+  for(let i = 0; i < 4; i++){
+    const w = new THREE.Mesh(wallG, earthMat);
+    w.castShadow = true;
+    const half = size / 2;
+    if(i === 0) w.position.set(0, 2.3, -half);
+    if(i === 1) w.position.set(0, 2.3, half);
+    if(i === 2){ w.position.set(-half, 2.3, 0); w.rotation.y = Math.PI/2; }
+    if(i === 3){ w.position.set(half, 2.3, 0); w.rotation.y = Math.PI/2; }
+    g.add(w);
+  }
+  // fraise of stakes around the work
+  const stakeG = new THREE.ConeGeometry(0.6, 3.6, 5);
+  for(let s = 0; s < 14; s++){
+    const a = (s / 14) * Math.PI * 2;
+    const st = new THREE.Mesh(stakeG, stakeMat);
+    st.position.set(Math.cos(a) * (size/2 + 4), 1.2, Math.sin(a) * (size/2 + 4));
+    st.rotation.z = Math.cos(a) * 0.7; st.rotation.x = -Math.sin(a) * 0.7;
+    g.add(st);
+  }
+  // British colours flying over the work (swapped at capture)
+  const poleH = 16;
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, poleH, 6),
+    new THREE.MeshStandardMaterial({ color:0x4a3a26 }));
+  pole.position.y = poleH/2;
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(7, 4.6),
+    new THREE.MeshStandardMaterial({ color:0xdc2626, side:THREE.DoubleSide }));
+  flag.position.set(3.8, poleH - 2.6, 0);
+  g.add(pole, flag);
+  scene.add(g);
+  return { group: g, flag, captured: false,
+    setCaptured(colorHex){ this.captured = true; this.flag.material.color.set(colorHex); } };
+}
+const redoubt9  = buildRedoubt(175, -8, 26);
+const redoubt10 = buildRedoubt(150, -78, 22);
+
+/* ---------- siege batteries: rows of cannon on the parallels ---------- */
+function buildBattery(x, z, n, facingX, facingZ){
+  const g = new THREE.Group();
+  const y = groundY(x, z);
+  g.position.set(x, y, z);
+  g.rotation.y = Math.atan2(-(facingZ - z), facingX - x) - Math.PI/2;
+  const barrelG = new THREE.CylinderGeometry(0.7, 0.9, 9, 7);
+  barrelG.rotateX(Math.PI/2);
+  const barrelM = new THREE.MeshStandardMaterial({ color:0x2e2e34, roughness:0.5, metalness:0.6 });
+  const carrG = new THREE.BoxGeometry(3.4, 2.2, 5);
+  const carrM = new THREE.MeshStandardMaterial({ color:0x6b5635, roughness:0.9 });
+  for(let i = 0; i < n; i++){
+    const off = (i - (n-1)/2) * 10;
+    const carr = new THREE.Mesh(carrG, carrM);
+    carr.position.set(off, 1.2, 0); carr.castShadow = true;
+    const bar = new THREE.Mesh(barrelG, barrelM);
+    bar.position.set(off, 2.6, -2.4); bar.rotation.x = -0.07;
+    bar.castShadow = true;
+    g.add(carr, bar);
+  }
+  g.visible = false;
+  scene.add(g);
+  return g;
+}
+/* battery positions on the parallels (Grand French Battery west, US batteries east) */
+const batteries = {
+  grandFR: buildBattery(-160, 145, 4, TOWN.x, TOWN.z),
+  usEast:  buildBattery( 165, 160, 3, TOWN.x, TOWN.z),
+  center1: buildBattery(  10, 230, 3, TOWN.x, TOWN.z),
+  par2W:   buildBattery( -95,  98, 3, TOWN.x, TOWN.z),
+  par2E:   buildBattery( 110,  92, 3, TOWN.x, TOWN.z),
+};
+function setBatteries(keys){ for(const k in batteries) batteries[k].visible = keys.includes(k); }
+
+/* ---------- Yorktown itself: colonial houses on the bluff ---------- */
+{
+  const g = new THREE.Group();
+  const houseG = new THREE.BoxGeometry(7, 5, 9);
+  const roofG  = new THREE.ConeGeometry(6.4, 3.6, 4);
+  const houseM = new THREE.MeshStandardMaterial({ color:0xcbb89a, roughness:0.9 });
+  const houseM2= new THREE.MeshStandardMaterial({ color:0xa8856a, roughness:0.9 });
+  const roofM  = new THREE.MeshStandardMaterial({ color:0x6e4f3a, roughness:1 });
+  let seed = 23; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for(let i = 0; i < 34; i++){
+    const a = rnd() * Math.PI * 2, r = rnd() * 70;
+    const x = TOWN.x + Math.cos(a) * r, z = TOWN.z + Math.sin(a) * r * 0.7;
+    if(groundY(x, z) < 4) continue;
+    const y = groundY(x, z);
+    const hw = new THREE.Mesh(houseG, rnd() < 0.5 ? houseM : houseM2);
+    hw.position.set(x, y + 2.5, z); hw.rotation.y = Math.floor(rnd()*4) * Math.PI/2;
+    hw.castShadow = true;
+    const hr = new THREE.Mesh(roofG, roofM);
+    hr.position.set(x, y + 6.5, z); hr.rotation.y = Math.PI/4 + hw.rotation.y;
+    g.add(hw, hr);
+  }
+  // small church tower
+  const tower = new THREE.Mesh(new THREE.BoxGeometry(6, 14, 6), houseM);
+  tower.position.set(TOWN.x + 14, groundY(TOWN.x + 14, TOWN.z - 8) + 7, TOWN.z - 8);
+  tower.castShadow = true;
+  const spire = new THREE.Mesh(new THREE.ConeGeometry(4.6, 7, 4), roofM);
+  spire.position.set(TOWN.x + 14, tower.position.y + 10.5, TOWN.z - 8);
+  g.add(tower, spire);
+  scene.add(g);
+}
+
+/* ---------- Gloucester Point: small British work across the river ---------- */
+{
+  const g = new THREE.Group();
+  const wallG = new THREE.BoxGeometry(44, 3.6, 3);
+  for(let i = 0; i < 3; i++){
+    const w = new THREE.Mesh(wallG, earthMat);
+    const a = Math.PI * 0.25 + i * Math.PI * 0.25;          // arc facing inland (north)
+    w.position.set(30 + Math.cos(a) * 34, groundY(30, -265) + 1.8, -265 - Math.sin(a) * 34 * -1);
+    w.position.z = -265 - Math.sin(a) * 34;
+    w.rotation.y = -a + Math.PI/2;
+    w.castShadow = true;
+    g.add(w);
+  }
+  scene.add(g);
+}
+
+/* ---------- allied camps: tent grids, revealed in Act 2 ---------- */
+function buildCamp(x, z, rows, colorHex){
+  const g = new THREE.Group();
+  g.position.set(x, groundY(x, z), z);
+  const tentG = new THREE.ConeGeometry(2.6, 3.4, 4);
+  const tentM = new THREE.MeshStandardMaterial({ color: colorHex, roughness:0.9 });
+  let seed = Math.abs(Math.round(x * 31 + z * 17)) + 5;
+  const rnd = () => (seed = (seed * 16807 + 11) % 2147483647) / 2147483647;
+  for(let i = 0; i < rows; i++) for(let j = 0; j < rows; j++){
+    if(rnd() < 0.2) continue;
+    const tent = new THREE.Mesh(tentG, tentM);
+    tent.position.set((i - rows/2 + 0.5) * 8, 1.7, (j - rows/2 + 0.5) * 8);
+    tent.rotation.y = Math.PI/4;
+    tent.castShadow = true;
+    g.add(tent);
+  }
+  g.visible = false;
+  scene.add(g);
+  return g;
+}
+const campUS = buildCamp(200, 340, 6, 0xd8d2c0);
+const campFR = buildCamp(-240, 310, 6, 0xe8e2d2);
+function setCampsVisible(v){
+  campUS.visible = campFR.visible = v;
+  lblCampUS.visible = lblCampFR.visible = v;
+}
+
+/* =====================================================================
+   SECTION 5 : UNITS, SHIPS & FLAGS
+   Land units = instanced soldier blocks + standard + clickable label.
+   Naval units = lines of square-rigged ships that sail and bob.
+   ===================================================================== */
+const FACTIONS = {
+  usa: { color:0x2563eb, dark:0x1e40af, css:'usa', name:'Continental Army' },
+  fra: { color:0xe8dfc2, dark:0xa8862e, css:'fra', name:'French Army' },
+  nav: { color:0x8b5cf6, dark:0x5b21b6, css:'nav', name:'French Navy' },
+  gbr: { color:0xdc2626, dark:0x991b1b, css:'gbr', name:'British Army' },
+};
+
+function makeFlagTexture(hex, symbol, textHex){
+  const cv = document.createElement('canvas');
+  cv.width = 128; cv.height = 96;
+  const c = cv.getContext('2d');
+  c.fillStyle = '#' + hex.toString(16).padStart(6, '0');
+  c.fillRect(0, 0, 128, 96);
+  c.strokeStyle = 'rgba(255,255,255,0.85)'; c.lineWidth = 5;
+  c.strokeRect(5, 5, 118, 86);
+  c.fillStyle = textHex || '#fff';
+  c.font = 'bold 40px Georgia'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(symbol, 64, 52);
+  const tx = new THREE.CanvasTexture(cv);
+  tx.colorSpace = THREE.SRGBColorSpace;
+  return tx;
+}
+
+function makeStandard(factionKey, symbol, big = false){
+  const f = FACTIONS[factionKey];
+  const g = new THREE.Group();
+  const poleH = big ? 26 : 18;
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.35, 0.45, poleH, 6),
+    new THREE.MeshStandardMaterial({ color:0x4a3a26, roughness:0.9 }));
+  pole.position.y = poleH / 2;
+  const flagW = big ? 14 : 10, flagH = big ? 9 : 7;
+  const flagGeo = new THREE.PlaneGeometry(flagW, flagH, 8, 4);
+  const dark = factionKey === 'fra';        // white flag needs dark lettering
+  const flag = new THREE.Mesh(flagGeo,
+    new THREE.MeshStandardMaterial({ map: makeFlagTexture(f.color, symbol, dark ? '#8a6d1f' : '#fff'),
+      side: THREE.DoubleSide, roughness:0.85 }));
+  flag.position.set(flagW / 2 + 0.4, poleH - flagH / 2 - 0.5, 0);
+  g.add(pole, flag);
+  const pos = flagGeo.attributes.position;
+  const base = pos.array.slice();
+  updateHooks.push((dt, t) => {
+    if(!g.visible || !g.parent?.visible) return;
+    for(let i = 0; i < pos.count; i++){
+      const x0 = base[i*3], y0 = base[i*3+1];
+      pos.setZ(i, Math.sin(x0 * 0.55 + t * 4.2) * 0.55 * ((x0 + flagW/2) / flagW));
+      pos.setY(i, y0 + Math.sin(x0 * 0.4 + t * 3.1) * 0.18);
+    }
+    pos.needsUpdate = true;
+  });
+  return g;
+}
+
+const clickables = [];
+const allUnits = [];
+
+class Unit {
+  constructor(opts){
+    const f = FACTIONS[opts.faction];
+    this.opts = opts;
+    this.faction = opts.faction;
+    this.group = new THREE.Group();
+
+    const soldierG = new THREE.CapsuleGeometry(0.85, 2.0, 3, 8);
+    const soldierM = new THREE.MeshStandardMaterial({ color:f.color, roughness:0.7 });
+    const n = opts.count;
+    const mesh = new THREE.InstancedMesh(soldierG, soldierM, n);
+    mesh.castShadow = true;
+    const dummy = new THREE.Object3D();
+    let seed = opts.key.length * 977 + 13;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const cols = Math.ceil(Math.sqrt(n * opts.w / opts.d));
+    const rows = Math.ceil(n / cols);
+    for(let i = 0; i < n; i++){
+      const cx = ((i % cols) / (cols - 1 || 1) - 0.5) * opts.w + (rnd() - 0.5) * 1.6;
+      const cz = ((Math.floor(i / cols)) / (rows - 1 || 1) - 0.5) * opts.d + (rnd() - 0.5) * 1.6;
+      dummy.position.set(cx, 1.9, cz);
+      dummy.rotation.y = (rnd() - 0.5) * 0.4;
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    }
+    mesh.userData.unit = this;
+    this.mesh = mesh;
+    this.group.add(mesh);
+    clickables.push(mesh);
+
+    this.standard = makeStandard(opts.faction, opts.symbol, opts.big);
+    this.standard.position.set(0, 0, -opts.d / 2 - 2);
+    this.group.add(this.standard);
+
+    const div = document.createElement('div');
+    div.className = 'unit-label ' + f.css;
+    div.textContent = opts.label;
+    div.addEventListener('click', (e) => { e.stopPropagation(); showInfoCard(this, e); });
+    this.labelObj = new CSS2DObject(div);
+    this.labelObj.position.set(0, opts.big ? 30 : 22, 0);
+    this.group.add(this.labelObj);
+
+    this.pos = new THREE.Vector3();
+    this.from = new THREE.Vector3();
+    this.to = new THREE.Vector3();
+    this.moveT = 1; this.moveDur = 1;
+    this.status = opts.info.status;
+
+    scene.add(this.group);
+    allUnits.push(this);
+    updateHooks.push((dt) => this.update(dt));
+  }
+  placeAt(x, z){
+    this.pos.set(x, 0, z);
+    this.from.copy(this.pos); this.to.copy(this.pos); this.moveT = 1;
+    this.applyPos();
+  }
+  moveTo(x, z, dur = 8, faceTarget = true){
+    this.from.copy(this.pos);
+    this.to.set(x, 0, z);
+    this.moveDur = dur; this.moveT = 0;
+    if(faceTarget && this.to.distanceTo(this.from) > 1){
+      this.group.rotation.y = Math.atan2(
+        -(this.to.z - this.from.z), this.to.x - this.from.x) - Math.PI / 2;
+    }
+  }
+  applyPos(){
+    const y = Math.max(groundY(this.pos.x, this.pos.z), 0.5);
+    this.group.position.set(this.pos.x, y, this.pos.z);
+  }
+  update(dt){
+    if(this.moveT < 1){
+      this.moveT = Math.min(1, this.moveT + dt / this.moveDur);
+      const e = this.moveT < 0.5 ? 2*this.moveT*this.moveT : 1 - Math.pow(-2*this.moveT + 2, 2) / 2;
+      this.pos.lerpVectors(this.from, this.to, e);
+      this.applyPos();
+    }
+  }
+  setVisible(v){ this.group.visible = v; }
+  setStatus(s){ this.status = s; }
+}
+
+/* ---------- square-rigged ships ---------- */
+function makeShip(big, hullHex, sailHex){
+  const g = new THREE.Group();
+  const L = big ? 34 : 26, B = big ? 9 : 7;
+  const hullM = new THREE.MeshStandardMaterial({ color:hullHex, roughness:0.85 });
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(B, 5, L), hullM);
+  hull.position.y = 2.2; hull.castShadow = true;
+  const bow = new THREE.Mesh(new THREE.ConeGeometry(B/2, 8, 4), hullM);
+  bow.rotation.x = -Math.PI/2; bow.rotation.y = Math.PI/4;
+  bow.position.set(0, 2.2, -L/2 - 3.4);
+  g.add(hull, bow);
+  // gun deck stripe
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(B + 0.3, 1.2, L * 0.86),
+    new THREE.MeshStandardMaterial({ color:0xd8c590, roughness:0.9 }));
+  stripe.position.y = 3.6;
+  g.add(stripe);
+  const mastM = new THREE.MeshStandardMaterial({ color:0x4a3a26, roughness:0.9 });
+  const sailM = new THREE.MeshStandardMaterial({ color:sailHex, roughness:0.85,
+    side:THREE.DoubleSide });
+  const nMast = big ? 3 : 2;
+  for(let m = 0; m < nMast; m++){
+    const mh = (big ? 30 : 24) - m * 3;
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.55, mh, 5), mastM);
+    const mz = (m - (nMast-1)/2) * L * 0.32;
+    mast.position.set(0, mh/2 + 4, mz);
+    g.add(mast);
+    for(let s = 0; s < 2; s++){
+      const sw = (big ? 13 : 10) - s * 3, sh = (big ? 8 : 6.5) - s * 1.5;
+      const sail = new THREE.Mesh(new THREE.PlaneGeometry(sw, sh), sailM);
+      sail.position.set(0, mh * (0.45 + s * 0.3) + 4, mz);
+      g.add(sail);
+    }
+  }
+  return g;
+}
+
+/* Fleet: a line of ships, drives & clicks like a Unit */
+class Fleet {
+  constructor(opts){
+    // opts: key, faction, label, count, big, spacing, hullHex, sailHex, info
+    const f = FACTIONS[opts.faction];
+    this.opts = opts;
+    this.faction = opts.faction;
+    this.group = new THREE.Group();
+    this.ships = [];
+    for(let i = 0; i < opts.count; i++){
+      const ship = makeShip(opts.big && i === 0, opts.hullHex, opts.sailHex);
+      ship.position.set((i % 2) * 18 - 9, 0, (i - (opts.count-1)/2) * (opts.spacing ?? 42));
+      ship.userData.bobPhase = i * 1.7;
+      this.group.add(ship);
+      this.ships.push(ship);
+      ship.traverse(o => { if(o.isMesh){ o.userData.unit = this; clickables.push(o); } });
+    }
+    // ensign on the lead ship
+    this.standard = makeStandard(opts.faction, opts.symbol, true);
+    this.standard.position.copy(this.ships[0].position);
+    this.standard.position.y = 6;
+    this.group.add(this.standard);
+
+    const div = document.createElement('div');
+    div.className = 'unit-label ' + f.css;
+    div.textContent = opts.label;
+    div.addEventListener('click', (e) => { e.stopPropagation(); showInfoCard(this, e); });
+    this.labelObj = new CSS2DObject(div);
+    this.labelObj.position.set(0, 42, 0);
+    this.group.add(this.labelObj);
+
+    this.pos = new THREE.Vector3();
+    this.from = new THREE.Vector3();
+    this.to = new THREE.Vector3();
+    this.moveT = 1; this.moveDur = 1;
+    this.status = opts.info.status;
+    scene.add(this.group);
+    updateHooks.push((dt, t) => this.update(dt, t));
+  }
+  placeAt(x, z){ this.pos.set(x, 0, z); this.from.copy(this.pos); this.to.copy(this.pos);
+    this.moveT = 1; this.group.position.set(x, 0, z); }
+  moveTo(x, z, dur = 10, faceTarget = true){
+    this.from.copy(this.pos); this.to.set(x, 0, z);
+    this.moveDur = dur; this.moveT = 0;
+    if(faceTarget && this.to.distanceTo(this.from) > 1){
+      this.group.rotation.y = Math.atan2(
+        -(this.to.z - this.from.z), this.to.x - this.from.x) - Math.PI / 2;
+    }
+  }
+  update(dt, t){
+    if(this.moveT < 1){
+      this.moveT = Math.min(1, this.moveT + dt / this.moveDur);
+      const e = this.moveT < 0.5 ? 2*this.moveT*this.moveT : 1 - Math.pow(-2*this.moveT + 2, 2) / 2;
+      this.pos.lerpVectors(this.from, this.to, e);
+      this.group.position.set(this.pos.x, 0, this.pos.z);
+    }
+    if(!this.group.visible) return;
+    for(const s of this.ships){
+      s.position.y = Math.sin(t * 0.8 + s.userData.bobPhase) * 0.5;
+      s.rotation.z = Math.sin(t * 0.6 + s.userData.bobPhase) * 0.03;
+    }
+  }
+  setVisible(v){ this.group.visible = v; }
+  setStatus(s){ this.status = s; }
+}
+
+/* ---------- the forces (strengths are period estimates) ---------- */
+const U = {};
+
+// AMERICANS — Washington
+U.washington = new Unit({ key:'washington', faction:'usa', label:'George Washington', symbol:'★',
+  count:55, w:17, d:13, big:true,
+  info:{ role:'Commander-in-Chief, Continental Army', strength:'~11,000 Americans at Yorktown (estimated)',
+    status:'Marching south',
+    desc:'George Washington seized the moment when de Grasse sailed for the Chesapeake: he slipped his army away from New York and marched 400 miles south in secrecy, locking Cornwallis against the river. He fired the ceremonial first siege gun (by tradition).' }});
+U.usInf = new Unit({ key:'usinf', faction:'usa', label:'Continental Infantry', symbol:'US',
+  count:120, w:36, d:13,
+  info:{ role:'Line infantry', strength:'~8,000 regulars + militia (approximate)',
+    status:'Marching south',
+    desc:'Continental regulars under Lafayette, Lincoln and von Steuben held the right (east) of the allied siege line, digging the parallels under nightly bombardment.' }});
+U.hamilton = new Unit({ key:'hamilton', faction:'usa', label:'Hamilton — Light Infantry', symbol:'⚡',
+  count:70, w:22, d:10,
+  info:{ role:'Lt. Colonel, light infantry assault force', strength:'~400 picked men (estimated)',
+    status:'In reserve',
+    desc:'Alexander Hamilton demanded — and won — command of the night assault on Redoubt 10. His light infantry took the work in under ten minutes with unloaded muskets and fixed bayonets.' }});
+U.usArt = new Unit({ key:'usart', faction:'usa', label:'American Artillery (Knox)', symbol:'⊕',
+  count:50, w:24, d:8,
+  info:{ role:'Siege artillery — Henry Knox', strength:'~100 siege guns & mortars combined allied (estimated)',
+    status:'Bringing up the guns',
+    desc:'Henry Knox directed the American batteries. Once the parallels opened, allied guns fired thousands of rounds into the British works, silencing their artillery.' }});
+
+// FRENCH ARMY — Rochambeau
+U.rochambeau = new Unit({ key:'rochambeau', faction:'fra', label:'Comte de Rochambeau', symbol:'⚜',
+  count:55, w:17, d:13, big:true,
+  info:{ role:'Commander, French Expeditionary Corps', strength:'~7,800 French regulars (estimated)',
+    status:'Marching south',
+    desc:'Jean-Baptiste de Rochambeau, a veteran of European sieges, marched his corps from Rhode Island alongside Washington. His engineers laid out the textbook siege approaches at Yorktown.' }});
+U.frInf = new Unit({ key:'frinf', faction:'fra', label:'French Infantry', symbol:'⚜',
+  count:120, w:36, d:13,
+  info:{ role:'Line infantry (incl. Royal Deux-Ponts)', strength:'~7,800 (estimated)',
+    status:'Marching south',
+    desc:'French regulars held the left (west) of the allied line. The Royal Deux-Ponts regiment stormed Redoubt 9 in the same night attack that took Redoubt 10.' }});
+U.frArt = new Unit({ key:'frart', faction:'fra', label:'French Siege Artillery', symbol:'⊕',
+  count:50, w:24, d:8,
+  info:{ role:'Siege train', strength:'heavy guns & mortars (approximate)',
+    status:'Bringing up the guns',
+    desc:'The French siege train — heavy 24-pounders and mortars — formed the Grand French Battery on the allied left, the most powerful battery of the siege.' }});
+U.lauzun = new Unit({ key:'lauzun', faction:'fra', label:"Lauzun's Legion", symbol:'♞',
+  count:60, w:24, d:9,
+  info:{ role:'Cavalry & light troops', strength:'~600 + Virginia militia (estimated)',
+    status:'Screening Gloucester',
+    desc:"The Duc de Lauzun's hussars and Virginia militia sealed the Gloucester side of the river, beating back Tarleton's cavalry and closing the last land exit." }});
+
+// BRITISH — Cornwallis
+U.cornwallis = new Unit({ key:'cornwallis', faction:'gbr', label:'Lord Cornwallis', symbol:'♔',
+  count:55, w:17, d:13, big:true,
+  info:{ role:'Commander, British southern army', strength:'~8,000–9,000 (estimated)',
+    status:'Fortifying Yorktown',
+    desc:'Charles, Earl Cornwallis, ordered to hold a deep-water harbour for the Royal Navy, fortified Yorktown expecting relief from New York. The fleet that arrived was French.' }});
+U.gbrInf = new Unit({ key:'gbrinf', faction:'gbr', label:'British & German Infantry', symbol:'GR',
+  count:130, w:38, d:14,
+  info:{ role:'Line infantry (British & Hessian)', strength:'~7,000 effectives (estimated)',
+    status:'Digging in',
+    desc:'British regulars and Hessian auxiliaries manned the earthworks ringing Yorktown, under round-the-clock bombardment once the allied batteries opened.' }});
+U.gbrGlou = new Unit({ key:'gbrglou', faction:'gbr', label:'Gloucester Garrison (Tarleton)', symbol:'♞',
+  count:60, w:24, d:9,
+  info:{ role:'Cavalry & infantry outpost', strength:'~1,000 (estimated)',
+    status:'Holding Gloucester Point',
+    desc:"Banastre Tarleton's force held Gloucester Point across the river — the planned escape route. Lauzun's cavalry and a storm on the river closed it." }});
+
+// FRENCH NAVY — de Grasse
+U.deGrasse = new Fleet({ key:'degrasse', faction:'nav', label:'Admiral de Grasse — Ville de Paris', symbol:'⚓',
+  count:3, big:true, spacing:52, hullHex:0x3d3450, sailHex:0xe8e0d2,
+  info:{ role:'Admiral, French West Indies fleet (flagship squadron)', strength:'28 ships of the line (estimated)',
+    status:'At sea',
+    desc:'François-Joseph de Grasse brought his entire battle fleet from the Caribbean. By defeating the Royal Navy at the Battle of the Chesapeake (5 Sep 1781), he sealed the bay — no rescue, no escape.' }});
+U.frFleet = new Fleet({ key:'frfleet', faction:'nav', label:'French Fleet — Blockade Line', symbol:'⚓',
+  count:6, big:false, spacing:46, hullHex:0x43395c, sailHex:0xe8e0d2,
+  info:{ role:'Ships of the line — blockade squadron', strength:'28 ships, ~1,700 guns (estimated)',
+    status:'At sea',
+    desc:'The blockade line anchored across the river mouth and bay. British relief under Admiral Graves turned back; Cornwallis was cut off from the sea.' }});
+
+/* ---------- initial deployment ---------- */
+U.cornwallis.placeAt(20, 30);
+U.gbrInf.placeAt(-45, 55);
+U.gbrGlou.placeAt(30, -262);
+U.washington.placeAt(-720, 240);
+U.usInf.placeAt(-770, 290);
+U.hamilton.placeAt(-760, 200);
+U.usArt.placeAt(-820, 250);
+U.rochambeau.placeAt(-730, 350);
+U.frInf.placeAt(-790, 390);
+U.frArt.placeAt(-840, 340);
+U.lauzun.placeAt(-700, 130);
+[U.washington, U.usInf, U.hamilton, U.usArt, U.rochambeau, U.frInf, U.frArt, U.lauzun]
+  .forEach(u => u.setVisible(false));
+U.deGrasse.placeAt(760, 60);   U.deGrasse.group.rotation.y = Math.PI/2;
+U.frFleet.placeAt(700, -120);  U.frFleet.group.rotation.y = Math.PI/2;
+[U.deGrasse, U.frFleet].forEach(u => u.setVisible(false));
+
+/* scuttled British ships off the Yorktown waterfront (visible from Act 3) */
+const scuttled = (() => {
+  const g = new THREE.Group();
+  for(let i = 0; i < 3; i++){
+    const s = makeShip(false, 0x5a3a30, 0xb8a890);
+    s.position.set(40 + i * 38, -2.2, -128 - (i % 2) * 18);
+    s.rotation.z = 0.38 + i * 0.12;
+    s.rotation.y = i * 0.8;
+    g.add(s);
+  }
+  g.visible = false;
+  scene.add(g);
+  return g;
+})();
+
+/* white surrender flag over the British works (Act 7) */
+const surrenderFlag = (() => {
+  const g = new THREE.Group();
+  const poleH = 30;
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, poleH, 6),
+    new THREE.MeshStandardMaterial({ color:0x4a3a26, roughness:0.9 }));
+  pole.position.y = poleH / 2;
+  const flagGeo = new THREE.PlaneGeometry(13, 9, 8, 4);
+  const flag = new THREE.Mesh(flagGeo, new THREE.MeshStandardMaterial({
+    color:0xf5f2e8, emissive:0x555048, side:THREE.DoubleSide, roughness:0.8 }));
+  flag.position.set(7, poleH - 5, 0);
+  g.add(pole, flag);
+  const div = document.createElement('div');
+  div.className = 'unit-label';
+  div.style.borderColor = '#f5f2e8'; div.style.color = '#fff';
+  div.textContent = '⚐ PARLEY';
+  const lbl = new CSS2DObject(div);
+  lbl.position.set(0, poleH + 6, 0);
+  g.add(lbl);
+  const pos = flagGeo.attributes.position;
+  const base = pos.array.slice();
+  updateHooks.push((dt, t) => {
+    if(!g.visible) return;
+    for(let i = 0; i < pos.count; i++){
+      const x0 = base[i*3], y0 = base[i*3+1];
+      pos.setZ(i, Math.sin(x0 * 0.5 + t * 3.5) * 0.7 * ((x0 + 6.5) / 13));
+      pos.setY(i, y0 + Math.sin(x0 * 0.4 + t * 2.6) * 0.2);
+    }
+    pos.needsUpdate = true;
+  });
+  const y = groundY(-30, 95);
+  g.position.set(-30, y, 95);          // on the British rampart facing the parallels
+  g.visible = false;
+  scene.add(g);
+  return g;
+})();
+const victoryBanner = document.getElementById('victory-banner');
+
+/* ---------- info card ---------- */
+const infoCard = document.getElementById('info-card');
+function showInfoCard(unit, ev){
+  const f = FACTIONS[unit.faction];
+  document.getElementById('ic-name').textContent = unit.opts.label;
+  const tag = document.getElementById('ic-faction');
+  tag.textContent = f.name;
+  tag.style.background = '#' + f.dark.toString(16).padStart(6,'0');
+  document.getElementById('ic-role').textContent = unit.opts.info.role;
+  document.getElementById('ic-strength').textContent = unit.opts.info.strength;
+  document.getElementById('ic-status').textContent = unit.status;
+  document.getElementById('ic-desc').textContent = unit.opts.info.desc;
+  infoCard.classList.add('visible');
+  const x = Math.min(innerWidth - 295, (ev?.clientX ?? innerWidth/2) + 14);
+  const y = Math.min(innerHeight - 270, (ev?.clientY ?? innerHeight/2) - 30);
+  infoCard.style.left = x + 'px'; infoCard.style.top = y + 'px';
+}
+document.getElementById('info-close').addEventListener('click',
+  () => infoCard.classList.remove('visible'));
+
+const raycaster = new THREE.Raycaster();
+const mouseV = new THREE.Vector2();
+let downXY = null;
+renderer.domElement.addEventListener('pointerdown', e => { downXY = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if(!downXY || Math.hypot(e.clientX - downXY[0], e.clientY - downXY[1]) > 6) return;
+  mouseV.set((e.clientX/innerWidth)*2 - 1, -(e.clientY/innerHeight)*2 + 1);
+  raycaster.setFromCamera(mouseV, camera);
+  const hits = raycaster.intersectObjects(clickables, false);
+  const hit = hits.find(h => h.object.userData.unit);
+  if(hit) showInfoCard(hit.object.userData.unit, e);
+  else infoCard.classList.remove('visible');
+});
+
+/* =====================================================================
+   SECTION 6 : EFFECTS
+   18th-century siege warfare: cannon & mortar fire with muzzle flash
+   and impact bursts, naval broadsides, musket volleys, burning
+   buildings, smoke, and broadcast-style assault arrows.
+   ===================================================================== */
+function makeGlowTexture(r, g, b){
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+  const c = cv.getContext('2d');
+  const gr = c.createRadialGradient(32, 32, 2, 32, 32, 30);
+  gr.addColorStop(0, `rgba(${r},${g},${b},1)`);
+  gr.addColorStop(0.4, `rgba(${r},${g},${b},0.55)`);
+  gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+  c.fillStyle = gr; c.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(cv);
+}
+const TEX_SOFT  = makeGlowTexture(255, 255, 255);
+const TEX_FIRE  = makeGlowTexture(255, 170, 60);
+const TEX_FLASH = makeGlowTexture(255, 220, 140);
+const TEX_SMOKE = makeGlowTexture(110, 105, 100);
+
+/* ---------- cannon batteries: arcing shells, flashes, impact bursts ---------- */
+class CannonFire {
+  constructor(nShells = 10){
+    this.active = false;
+    this.sources = []; this.targets = [];
+    this.shells = [];
+    const shellG = new THREE.SphereGeometry(0.9, 6, 6);
+    const shellM = new THREE.MeshBasicMaterial({ color:0xffd9a0 });
+    for(let i = 0; i < nShells; i++){
+      const m = new THREE.Mesh(shellG, shellM);
+      m.visible = false;
+      scene.add(m);
+      this.shells.push({ mesh:m, t: 1 + Math.random()*2, dur: 1.6,
+        from:new THREE.Vector3(), to:new THREE.Vector3() });
+    }
+    // shared pools of muzzle flashes & impact bursts
+    this.flashes = [];
+    for(let i = 0; i < nShells; i++){
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map:TEX_FLASH, transparent:true,
+        depthWrite:false, blending:THREE.AdditiveBlending, opacity:0 }));
+      s.scale.setScalar(1);
+      scene.add(s);
+      this.flashes.push({ sprite:s, t:1, burst:false });
+    }
+    this.light = new THREE.PointLight(0xffc070, 0, 160, 1.7);
+    scene.add(this.light);
+    updateHooks.push((dt) => this.update(dt));
+  }
+  configure(sources, targets){ this.sources = sources; this.targets = targets; }
+  start(){ this.active = true; }
+  stop(){ this.active = false;
+    this.shells.forEach(s => s.mesh.visible = false);
+    this.flashes.forEach(f => { f.t = 1; f.sprite.material.opacity = 0; });
+    this.light.intensity = 0; }
+  spawnFlash(p, big){
+    const f = this.flashes.find(f => f.t >= 1);
+    if(!f) return;
+    f.t = 0; f.big = big;
+    f.sprite.position.copy(p);
+    this.light.position.copy(p); this.light.position.y += 4;
+    this.light.intensity = big ? 260 : 160;
+  }
+  update(dt){
+    this.light.intensity = Math.max(0, this.light.intensity - dt * 900);
+    for(const f of this.flashes){
+      if(f.t < 1){
+        f.t = Math.min(1, f.t + dt * (f.big ? 2.2 : 4));
+        f.sprite.material.opacity = (1 - f.t) * 0.95;
+        f.sprite.scale.setScalar((f.big ? 10 + f.t * 26 : 5 + f.t * 9));
+      } else f.sprite.material.opacity = 0;
+    }
+    if(!this.active || !this.sources.length) return;
+    for(const sh of this.shells){
+      sh.t += dt / sh.dur;
+      if(sh.t >= 1){
+        if(sh.mesh.visible){                       // impact
+          this.spawnFlash(sh.to, true);
+          sh.mesh.visible = false;
+        }
+        if(Math.random() < dt * 2.4){              // reload & fire
+          sh.t = 0; sh.dur = 1.4 + Math.random() * 0.8;
+          const s = this.sources[Math.floor(Math.random() * this.sources.length)];
+          const tg = this.targets[Math.floor(Math.random() * this.targets.length)];
+          sh.from.set(s[0], Math.max(groundY(s[0], s[1]), 0) + 4, s[1]);
+          sh.to.set(tg[0] + (Math.random()-0.5) * 70,
+            Math.max(groundY(tg[0], tg[1]), 0) + 1, tg[1] + (Math.random()-0.5) * 60);
+          sh.mesh.visible = true;
+          this.spawnFlash(sh.from, false);
+        }
+        continue;
+      }
+      sh.mesh.position.lerpVectors(sh.from, sh.to, sh.t);
+      sh.mesh.position.y += Math.sin(sh.t * Math.PI) * 55;
+    }
+  }
+}
+const alliedGuns  = new CannonFire(12);   // parallels -> town
+const britishGuns = new CannonFire(7);    // town -> parallels
+const navalGuns   = new CannonFire(8);    // fleet -> river mouth / warning line
+
+/* ---------- musket volleys (flat, fast — for the redoubt assault) ---------- */
+class Volley {
+  constructor(colorHex, n = 90, size = 2.0){
+    this.n = n;
+    this.from = new THREE.Vector3(); this.to = new THREE.Vector3();
+    this.spreadF = 20; this.spreadT = 22; this.arc = 10; this.speed = 0.9;
+    this.t = new Float32Array(n);
+    this.offF = []; this.offT = [];
+    for(let i = 0; i < n; i++){
+      this.t[i] = Math.random();
+      this.offF.push([(Math.random()-0.5), (Math.random()-0.5)]);
+      this.offT.push([(Math.random()-0.5), (Math.random()-0.5)]);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+    this.points = new THREE.Points(geo, new THREE.PointsMaterial({
+      color: colorHex, size, map: TEX_SOFT, transparent: true, opacity: 0.95,
+      depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.points.visible = false;
+    this.active = false;
+    scene.add(this.points);
+    updateHooks.push((dt) => this.update(dt));
+  }
+  fireBetween(fx, fz, tx, tz){
+    this.from.set(fx, Math.max(groundY(fx, fz), 0) + 3, fz);
+    this.to.set(tx, Math.max(groundY(tx, tz), 0) + 2, tz);
+    this.active = true; this.points.visible = true;
+  }
+  stop(){ this.active = false; this.points.visible = false; }
+  update(dt){
+    if(!this.active) return;
+    const p = this.points.geometry.attributes.position;
+    for(let i = 0; i < this.n; i++){
+      this.t[i] += dt * this.speed * (0.8 + (i % 7) * 0.06);
+      if(this.t[i] > 1) this.t[i] -= 1;
+      const k = this.t[i];
+      const fx = this.from.x + this.offF[i][0] * this.spreadF;
+      const fz = this.from.z + this.offF[i][1] * this.spreadF;
+      const tx = this.to.x + this.offT[i][0] * this.spreadT;
+      const tz = this.to.z + this.offT[i][1] * this.spreadT;
+      const x = fx + (tx - fx) * k;
+      const z = fz + (tz - fz) * k;
+      const y = this.from.y + (this.to.y - this.from.y) * k + Math.sin(k * Math.PI) * this.arc;
+      p.setXYZ(i, x, y, z);
+    }
+    p.needsUpdate = true;
+  }
+}
+const volleys = {
+  britOut:  new Volley(0xff9a8a),    // British muskets at the assault columns
+  usCharge: new Volley(0x9ec3ff),    // American covering fire at Redoubt 10
+  frCharge: new Volley(0xfff0c0),    // French covering fire at Redoubt 9
+};
+
+/* ---------- assault arrows (broadcast-graphics style) ---------- */
+function makeAssaultArrow(fx, fz, tx, tz, colorHex){
+  const from = new THREE.Vector2(fx, fz), to = new THREE.Vector2(tx, tz);
+  const dir = to.clone().sub(from); dir.normalize();
+  const perp = new THREE.Vector2(-dir.y, dir.x);
+  const STEPS = 24, bodyFrac = 0.78, wBody = 7, wHead = 16;
+  const verts = [], idx = [];
+  const yAt = (x, z) => Math.max(terrainHeight(x, z), 0) + 2.2;
+  for(let i = 0; i <= STEPS; i++){
+    const k = i / STEPS;
+    const p = from.clone().lerp(to, k * bodyFrac);
+    const w = wBody * (0.35 + 0.65 * k);
+    for(const s of [-1, 1]){
+      const vx = p.x + perp.x * w * s, vz = p.y + perp.y * w * s;
+      verts.push(vx, yAt(vx, vz), vz);
+    }
+    if(i < STEPS){ const a = i*2; idx.push(a, a+1, a+2, a+1, a+3, a+2); }
+  }
+  const hb = from.clone().lerp(to, bodyFrac);
+  const hl = [hb.x + perp.x * wHead, hb.y + perp.y * wHead];
+  const hr = [hb.x - perp.x * wHead, hb.y - perp.y * wHead];
+  const base = verts.length / 3;
+  verts.push(hl[0], yAt(hl[0], hl[1]), hl[1]);
+  verts.push(hr[0], yAt(hr[0], hr[1]), hr[1]);
+  verts.push(to.x, yAt(to.x, to.y), to.y);
+  idx.push(base, base + 2, base + 1);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  const mat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true,
+    opacity: 0.55, side: THREE.DoubleSide, depthWrite: false });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.visible = false;
+  mesh.userData.phase = Math.random() * 6.28;
+  scene.add(mesh);
+  updateHooks.push((dt, t) => {
+    if(!mesh.visible) return;
+    mat.opacity = 0.32 + 0.3 * (0.5 + 0.5 * Math.sin(t * 3 + mesh.userData.phase));
+  });
+  return mesh;
+}
+const assaultArrows = {
+  r10: makeAssaultArrow(195, 95, 152, -68, 0x6ea8ff),   // Hamilton -> Redoubt 10
+  r9:  makeAssaultArrow(235, 80, 180, 0, 0xf0d890),     // Deux-Ponts -> Redoubt 9
+  marchUS: makeAssaultArrow(-560, 240, -160, 300, 0x6ea8ff),  // allied approach march
+  marchFR: makeAssaultArrow(-600, 330, -280, 330, 0xf0d890),
+  fleetIn: makeAssaultArrow(770, 240, 600, 30, 0xb08cff),     // fleet entering the bay
+};
+
+/* ---------- fire + smoke emitters ---------- */
+class FireEmitter {
+  constructor(x, z, scale = 1, smoke = true){
+    this.group = new THREE.Group();
+    const y = Math.max(groundY(x, z), 0);
+    this.group.position.set(x, y, z);
+    this.flames = [];
+    for(let i = 0; i < 3; i++){
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX_FIRE,
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+        opacity: 0.85 }));
+      s.scale.setScalar((6 + i * 3) * scale);
+      s.position.y = (3 + i * 2.5) * scale;
+      this.group.add(s); this.flames.push(s);
+    }
+    this.smoke = [];
+    if(smoke){
+      for(let i = 0; i < 4; i++){
+        const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX_SMOKE,
+          transparent: true, depthWrite: false, opacity: 0.3 }));
+        s.userData.k = i / 4;
+        this.group.add(s); this.smoke.push(s);
+      }
+    }
+    this.light = new THREE.PointLight(0xff9a3c, 0, 90 * scale, 1.8);
+    this.light.position.y = 8 * scale;
+    this.group.add(this.light);
+    this.scaleF = scale;
+    this.group.visible = false;
+    scene.add(this.group);
+    updateHooks.push((dt, t) => this.update(dt, t));
+  }
+  set(on){ this.group.visible = on; this.light.intensity = on ? 120 * this.scaleF : 0; }
+  update(dt, t){
+    if(!this.group.visible) return;
+    this.flames.forEach((f, i) => {
+      const n = Math.sin(t * 11 + i * 2.1) * 0.5 + Math.sin(t * 17 + i) * 0.3;
+      f.material.opacity = 0.65 + n * 0.25;
+      f.scale.setScalar((6 + i * 3) * this.scaleF * (1 + n * 0.12));
+    });
+    this.light.intensity = (110 + Math.sin(t * 13) * 30) * this.scaleF;
+    this.smoke.forEach(s => {
+      s.userData.k = (s.userData.k + dt * 0.12) % 1;
+      const k = s.userData.k;
+      s.position.set(Math.sin(k * 9) * 4 * this.scaleF, (8 + k * 55) * this.scaleF, Math.cos(k * 7) * 4);
+      s.scale.setScalar((10 + k * 30) * this.scaleF);
+      s.material.opacity = 0.34 * (1 - k);
+    });
+  }
+}
+const fires = {
+  town1: new FireEmitter(-18, -48, 1.3), town2: new FireEmitter(35, -62, 1.1),
+  town3: new FireEmitter(5, -20, 1.0),
+  ship:  new FireEmitter(78, -132, 1.2),          // burning HMS Charon on the river
+  r9:    new FireEmitter(175, -8, 0.8), r10: new FireEmitter(150, -78, 0.8),
+};
+function setFires(keys){ for(const k in fires) fires[k].set(keys.includes(k)); }
+
+/* ---------- dust / powder-smoke clouds at melee points ---------- */
+class DustCloud {
+  constructor(x, z, radius = 30, n = 9, colorHex = 0xb8b0a0){
+    this.group = new THREE.Group();
+    this.group.position.set(x, Math.max(groundY(x, z), 0), z);
+    this.sprites = [];
+    for(let i = 0; i < n; i++){
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX_SMOKE,
+        color: colorHex, transparent: true, depthWrite: false, opacity: 0.22 }));
+      s.userData = { a: Math.random() * 6.28, r: Math.random() * radius, sp: 0.3 + Math.random() * 0.5 };
+      s.scale.setScalar(16 + Math.random() * 18);
+      this.group.add(s); this.sprites.push(s);
+    }
+    this.group.visible = false;
+    scene.add(this.group);
+    updateHooks.push((dt, t) => {
+      if(!this.group.visible) return;
+      for(const s of this.sprites){
+        s.userData.a += dt * s.userData.sp;
+        s.position.set(Math.cos(s.userData.a) * s.userData.r, 6 + Math.sin(s.userData.a * 1.7) * 3,
+          Math.sin(s.userData.a) * s.userData.r);
+        s.material.opacity = 0.16 + 0.1 * Math.sin(t * 2 + s.userData.a);
+      }
+    });
+  }
+  set(on){ this.group.visible = on; }
+}
+const dust = {
+  march:  new DustCloud(-400, 280, 60),
+  town:   new DustCloud(0, -50, 50, 11, 0x9a948a),     // powder smoke over the town
+  r9:     new DustCloud(175, -8, 22),
+  r10:    new DustCloud(150, -78, 20),
+  glou:   new DustCloud(30, -300, 30),
+};
+function setDust(keys){ for(const k in dust) dust[k].set(keys.includes(k)); }
+
+function stopAllEffects(){
+  alliedGuns.stop(); britishGuns.stop(); navalGuns.stop();
+  Object.values(volleys).forEach(v => v.stop());
+  Object.values(assaultArrows).forEach(a => a.visible = false);
+  setFires([]); setDust([]);
+  surrenderFlag.visible = false;
+  victoryBanner.classList.remove('visible');
+}
+
+/* =====================================================================
+   SECTION 7 : TIMELINE / ACTS
+   Each act = deterministic state-setter (enter) + camera path +
+   timed mid-act triggers. Acts can be replayed in any order.
+   ===================================================================== */
+function setBars(supplies, morale, artillery, blockade){
+  const set = (id, v) => {
+    document.getElementById('b-' + id).style.width = v + '%';
+    document.getElementById('v-' + id).textContent = '~' + v + '%';
+  };
+  set('supplies', supplies); set('morale', morale);
+  set('artillery', artillery); set('blockade', blockade);
+}
+function resetRedoubts(){
+  redoubt9.flag.material.color.set(0xdc2626);
+  redoubt10.flag.material.color.set(0xdc2626);
+}
+
+const ACTS = [
+{
+  id: 1, title: 'Cornwallis Fortifies Yorktown', duration: 26,
+  desc: 'August 1781. Ordered to hold a deep-water port for the Royal Navy, Cornwallis digs in at Yorktown on the York River, with an outpost at Gloucester Point on the far bank. Earthworks, batteries and the detached Redoubts 9 and 10 ring the town.',
+  event: 'British engineers raise the defensive line and Redoubts 9 & 10',
+  camera: [ [950, 760, 950, 0, 0, 0], [420, 330, 520, 0, 8, -60],
+            [130, 150, 200, 0, 12, -55], [-150, 110, 150, 0, 8, -55],
+            [90, 150, -430, 30, 6, -260] ],
+  enter(){
+    setMood(0x9db8cc, 0xfff3da, 1.55, 0.85);
+    setLineTarget(britLine, 1); setLineTarget(par1, 0); setLineTarget(par2, 0);
+    setCampsVisible(false); setBatteries([]);
+    setBlockade(false); scuttled.visible = false;
+    stopAllEffects();
+    resetRedoubts();
+    U.cornwallis.placeAt(20, 30);  U.cornwallis.setStatus('Fortifying Yorktown');
+    U.gbrInf.placeAt(-45, 55);     U.gbrInf.setStatus('Digging in');
+    U.gbrGlou.placeAt(30, -262);   U.gbrGlou.setStatus('Holding Gloucester Point');
+    [U.cornwallis, U.gbrInf, U.gbrGlou].forEach(u => u.setVisible(true));
+    [U.washington, U.usInf, U.hamilton, U.usArt,
+     U.rochambeau, U.frInf, U.frArt, U.lauzun].forEach(u => u.setVisible(false));
+    [U.deGrasse, U.frFleet].forEach(u => u.setVisible(false));
+    setBars(85, 90, 0, 0);
+  },
+  triggers: [
+    { at: 16, fn(){ document.getElementById('act-event').textContent =
+        'Cornwallis expects the Royal Navy to relieve or evacuate him by sea'; } }
+  ]
+},
+{
+  id: 2, title: 'Washington & Rochambeau March South', duration: 26,
+  desc: 'August–September 1781. Feinting at New York, Washington and Rochambeau secretly march their armies 400 miles south to Virginia. By late September ~17,000 allied troops converge on Williamsburg and close in on the York peninsula.',
+  event: 'The allied armies arrive — Americans on the right, French on the left',
+  camera: [ [-780, 420, 480, -400, 10, 250], [-420, 250, 420, -180, 10, 260],
+            [-80, 190, 480, 30, 10, 280], [240, 330, 430, 0, 10, 40] ],
+  enter(){
+    setMood(0xa8bdc8, 0xffeccc, 1.5, 0.8);
+    setLineTarget(britLine, 1); setLineTarget(par1, 0); setLineTarget(par2, 0);
+    setCampsVisible(true); setBatteries([]);
+    setBlockade(false); scuttled.visible = false;
+    stopAllEffects();
+    resetRedoubts();
+    setDust(['march']);
+    assaultArrows.marchUS.visible = true;
+    assaultArrows.marchFR.visible = true;
+    [U.washington, U.usInf, U.hamilton, U.usArt,
+     U.rochambeau, U.frInf, U.frArt, U.lauzun].forEach(u => u.setVisible(true));
+    U.washington.placeAt(-720, 240); U.washington.moveTo(150, 290, 13);
+    U.usInf.placeAt(-770, 290);      U.usInf.moveTo(230, 250, 14);
+    U.hamilton.placeAt(-760, 200);   U.hamilton.moveTo(280, 190, 15);
+    U.usArt.placeAt(-820, 250);      U.usArt.moveTo(180, 380, 16);
+    U.rochambeau.placeAt(-730, 350); U.rochambeau.moveTo(-200, 270, 13);
+    U.frInf.placeAt(-790, 390);      U.frInf.moveTo(-270, 230, 14);
+    U.frArt.placeAt(-840, 340);      U.frArt.moveTo(-290, 330, 16);
+    U.lauzun.placeAt(-700, 130);     U.lauzun.moveTo(-60, -330, 17);
+    [U.washington, U.usInf, U.hamilton, U.usArt].forEach(u => u.setStatus('Marching on Yorktown'));
+    [U.rochambeau, U.frInf, U.frArt].forEach(u => u.setStatus('Marching on Yorktown'));
+    U.lauzun.setStatus('Sealing the Gloucester side');
+    U.cornwallis.setStatus('Watching the roads');
+    U.gbrInf.setStatus('Manning the works');
+    setBars(80, 85, 5, 10);
+  },
+  triggers: [
+    { at: 15, fn(){ setDust([]);
+        document.getElementById('act-event').textContent =
+          "Lauzun's Legion and Virginia militia seal Gloucester — the land ring closes"; } }
+  ]
+},
+{
+  id: 3, title: 'French Fleet Controls the Chesapeake', duration: 26,
+  desc: 'On 5 September de Grasse defeats the Royal Navy at the Battle of the Chesapeake and returns to seal the bay with 28 ships of the line. Cornwallis scuttles ships to block a landing. No rescue can reach him; no evacuation can leave.',
+  event: 'The Royal Navy turns back — the sea lane to New York is cut',
+  camera: [ [820, 240, 460, 620, 0, -40], [680, 90, 240, 600, 4, -70],
+            [720, 130, -200, 580, 4, -80], [380, 460, 380, 250, 0, -80] ],
+  enter(){
+    setMood(0x8fb0c8, 0xf0ead0, 1.45, 0.8);
+    setLineTarget(britLine, 1); setLineTarget(par1, 0); setLineTarget(par2, 0);
+    setCampsVisible(true); setBatteries([]);
+    stopAllEffects();
+    resetRedoubts();
+    setBlockade(true);
+    scuttled.visible = true;
+    assaultArrows.fleetIn.visible = true;
+    [U.deGrasse, U.frFleet].forEach(u => u.setVisible(true));
+    U.deGrasse.placeAt(820, 180);  U.deGrasse.moveTo(640, 40, 14);
+    U.frFleet.placeAt(800, -40);   U.frFleet.moveTo(610, -130, 13);
+    U.deGrasse.setStatus('Commanding the blockade');
+    U.frFleet.setStatus('Anchored across the river mouth');
+    U.cornwallis.setStatus('Cut off — awaiting relief that cannot come');
+    U.gbrInf.setStatus('Rationing supplies');
+    U.washington.setStatus('Preparing the siege');
+    U.rochambeau.setStatus('Laying out the approaches');
+    setBars(60, 75, 5, 90);
+  },
+  triggers: [
+    { at: 12, fn(){
+        navalGuns.configure([[640, 40], [610, -130], [605, -60]], [[420, -140], [380, -90]]);
+        navalGuns.start();
+        document.getElementById('act-event').textContent =
+          'French ships of the line fire warning broadsides across the river mouth'; } },
+    { at: 19, fn(){
+        document.getElementById('act-event').textContent =
+          'Cornwallis scuttles transports along the waterfront to block a landing'; } }
+  ]
+},
+{
+  id: 4, title: 'The Allied Siege Begins — First Parallel', duration: 28,
+  desc: 'Night of 6 October. In a single night the allies dig the First Parallel — a trench arc ~800 yards from the British works. On 9 October the batteries open; Washington fires the first American gun (by tradition). The bombardment never stops.',
+  event: 'Thousands of shovels bite into the sandy soil under cover of dark',
+  camera: [ [-100, 230, 520, -40, 8, 200], [80, 90, 330, 80, 8, 240],
+            [200, 130, 280, 0, 12, -40], [60, 170, 80, 0, 10, -55] ],
+  enter(){
+    setMood(0x8aa2b8, 0xffe2b0, 1.3, 0.7);
+    setLineTarget(britLine, 1); setLineTarget(par1, 1); setLineTarget(par2, 0);
+    setCampsVisible(true);
+    setBlockade(true); scuttled.visible = true;
+    stopAllEffects();
+    resetRedoubts();
+    setBatteries(['grandFR', 'usEast', 'center1']);
+    U.washington.moveTo(60, 300, 6);   U.washington.setStatus('Directing the siege');
+    U.usInf.moveTo(180, 210, 8);       U.usInf.setStatus('Digging the First Parallel');
+    U.hamilton.moveTo(230, 170, 8);    U.hamilton.setStatus('In the trenches');
+    U.usArt.moveTo(160, 165, 9);       U.usArt.setStatus('Serving the eastern batteries');
+    U.rochambeau.moveTo(-160, 250, 6); U.rochambeau.setStatus('Supervising the approaches');
+    U.frInf.moveTo(-210, 180, 8);      U.frInf.setStatus('Digging the First Parallel');
+    U.frArt.moveTo(-165, 150, 9);      U.frArt.setStatus('Serving the Grand French Battery');
+    U.lauzun.setStatus('Holding the Gloucester line');
+    U.cornwallis.setStatus('Under bombardment');
+    U.gbrInf.setStatus('Pinned in the works');
+    U.deGrasse.setStatus('Holding the bay');
+    U.frFleet.setStatus('Blockading');
+    setBars(45, 60, 55, 95);
+  },
+  triggers: [
+    { at: 9, fn(){
+        alliedGuns.configure(
+          [[-160, 145], [10, 230], [165, 160]],
+          [[0, -55], [-45, 55], [60, 20]]);
+        alliedGuns.start();
+        britishGuns.configure([[-40, 80], [70, 45]], [[0, 235], [-150, 150], [160, 165]]);
+        britishGuns.start();
+        setFires(['town3']); setDust(['town']);
+        document.getElementById('act-event').textContent =
+          'The batteries open — Washington fires the first gun (by tradition)'; } },
+    { at: 18, fn(){ setFires(['town1', 'town3']);
+        document.getElementById('act-event').textContent =
+          'Red-hot shot sets the waterfront ablaze; British guns begin to fall silent'; } }
+  ]
+},
+{
+  id: 5, title: 'Second Parallel & Artillery Pressure', duration: 26,
+  desc: 'On 11 October the allies open the Second Parallel, only ~300 yards out. But its right flank cannot be finished: the detached Redoubts 9 and 10 enfilade the new trench. They will have to be stormed.',
+  event: 'The trench creeps forward — Redoubts 9 & 10 block the final stretch',
+  camera: [ [-80, 160, 360, 0, 8, 100], [130, 90, 220, 130, 8, 30],
+            [230, 100, 100, 165, 6, -40], [0, 420, 320, 0, 0, -20] ],
+  enter(){
+    setMood(0x6e7d94, 0xffc890, 1.1, 0.6);
+    setLineTarget(britLine, 1); setLineTarget(par1, 1); setLineTarget(par2, 1);
+    setCampsVisible(true);
+    setBlockade(true); scuttled.visible = true;
+    stopAllEffects();
+    resetRedoubts();
+    setBatteries(['grandFR', 'usEast', 'center1', 'par2W', 'par2E']);
+    alliedGuns.configure(
+      [[-95, 98], [110, 92], [-160, 145], [10, 230]],
+      [[0, -55], [-45, 55], [60, 20], [110, -10]]);
+    alliedGuns.start();
+    britishGuns.configure([[-40, 80]], [[-95, 100], [110, 95]]);
+    britishGuns.start();
+    setFires(['town1', 'town2', 'ship']); setDust(['town']);
+    U.usInf.moveTo(120, 130, 8);     U.usInf.setStatus('Digging the Second Parallel');
+    U.hamilton.moveTo(200, 110, 7);  U.hamilton.setStatus('Volunteering to storm Redoubt 10');
+    U.usArt.moveTo(115, 100, 8);     U.usArt.setStatus('Advancing the guns');
+    U.frInf.moveTo(-120, 125, 8);    U.frInf.setStatus('Digging the Second Parallel');
+    U.frArt.moveTo(-100, 105, 8);    U.frArt.setStatus('Advancing the guns');
+    U.washington.setStatus('Pressing the siege');
+    U.rochambeau.setStatus('Pressing the siege');
+    U.cornwallis.setStatus('Guns silenced one by one');
+    U.gbrInf.setStatus('Sheltering from the barrage');
+    setBars(30, 45, 80, 95);
+  },
+  triggers: [
+    { at: 13, fn(){ document.getElementById('act-event').textContent =
+        'The fire-ship HMS Charon burns at her moorings, struck by red-hot shot'; } },
+    { at: 20, fn(){ document.getElementById('act-event').textContent =
+        'The second line stops short — Redoubts 9 & 10 must be taken by storm'; } }
+  ]
+},
+{
+  id: 6, title: 'Assault on Redoubts 9 & 10', duration: 30,
+  desc: 'Night of 14 October. Two simultaneous bayonet assaults: Hamilton\'s American light infantry storms Redoubt 10 by the river; the Royal Deux-Ponts storms Redoubt 9. Both fall in minutes. The parallel is extended; allied guns now fire into Yorktown at point-blank range.',
+  event: 'Diversionary fire — then the columns go in silently, bayonets fixed',
+  camera: [ [280, 110, 170, 165, 8, -30], [215, 55, -25, 150, 5, -78],
+            [250, 65, 50, 178, 5, -8], [195, 75, -65, 162, 8, -45],
+            [120, 320, 210, 130, 0, -40] ],
+  enter(){
+    setMood(0x1a2236, 0x6a76b8, 0.35, 0.3);    // night assault
+    setLineTarget(britLine, 1); setLineTarget(par1, 1); setLineTarget(par2, 1);
+    setCampsVisible(true);
+    setBlockade(true); scuttled.visible = true;
+    stopAllEffects();
+    resetRedoubts();
+    setBatteries(['grandFR', 'usEast', 'center1', 'par2W', 'par2E']);
+    setFires(['town1', 'ship']);
+    U.hamilton.placeAt(205, 105); U.hamilton.moveTo(152, -62, 9);
+    U.hamilton.setStatus('Storming Redoubt 10 — bayonets only');
+    U.frInf.placeAt(245, 95); U.frInf.moveTo(182, 6, 11);
+    U.frInf.setStatus('Storming Redoubt 9');
+    U.usInf.moveTo(150, 120, 6);   U.usInf.setStatus('Feinting against the centre');
+    U.washington.setStatus('Watching from the parallel');
+    U.rochambeau.setStatus('Watching from the parallel');
+    U.cornwallis.setStatus('Defences crumbling');
+    U.gbrInf.setStatus('Repelling the night assault');
+    assaultArrows.r10.visible = true;
+    assaultArrows.r9.visible = true;
+    volleys.britOut.fireBetween(165, -40, 200, 60);
+    setDust(['r9', 'r10']);
+    setBars(20, 30, 92, 98);
+  },
+  triggers: [
+    { at: 8, fn(){
+        volleys.usCharge.fireBetween(185, 50, 152, -68);
+        volleys.frCharge.fireBetween(225, 50, 180, 0);
+        document.getElementById('act-event').textContent =
+          'The columns swarm over the parapets in the dark'; } },
+    { at: 15, fn(){
+        redoubt10.setCaptured(0x2563eb);
+        volleys.usCharge.stop();
+        dust.r10.set(false);
+        document.getElementById('act-event').textContent =
+          'Redoubt 10 falls in under ten minutes — Hamilton\'s men take it with bayonets alone'; } },
+    { at: 21, fn(){
+        redoubt9.setCaptured(0xe8dfc2);
+        volleys.frCharge.stop(); volleys.britOut.stop();
+        dust.r9.set(false);
+        document.getElementById('act-event').textContent =
+          'Redoubt 9 falls to the Royal Deux-Ponts — the British line is broken'; } },
+    { at: 25, fn(){
+        U.hamilton.setStatus('Holding Redoubt 10');
+        U.frInf.setStatus('Holding Redoubt 9');
+        U.gbrInf.setStatus('Falling back to the inner works'); } }
+  ]
+},
+{
+  id: 7, title: 'The British Surrender', duration: 28,
+  desc: 'A last sortie fails; a storm wrecks the night evacuation to Gloucester. On 17 October a drummer beats parley. On 19 October ~8,000 British and German soldiers march out between the allied lines and lay down their arms. London\'s will to fight is broken: the war is effectively decided.',
+  event: 'A lone drummer in red appears on the parapet, beating for parley',
+  camera: [ [70, 190, 250, 0, 10, -55], [40, 95, 70, -25, 14, 70],
+            [-80, 130, 280, -90, 8, 180], [160, 850, 260, 80, 0, -20] ],
+  enter(){
+    setMood(0xbcc8d4, 0xfff7e0, 1.5, 0.9);     // grey morning after
+    setLineTarget(britLine, 1); setLineTarget(par1, 1); setLineTarget(par2, 1);
+    setCampsVisible(true);
+    setBlockade(true); scuttled.visible = true;
+    stopAllEffects();
+    redoubt10.setCaptured(0x2563eb); redoubt9.setCaptured(0xe8dfc2);
+    setBatteries(['grandFR', 'usEast', 'center1', 'par2W', 'par2E']);
+    setFires(['town2']);                        // smoke still rising
+    U.cornwallis.setStatus('Suing for terms');
+    U.gbrInf.moveTo(-60, 140, 10); U.gbrInf.setStatus('Marching out to ground arms');
+    U.gbrGlou.setStatus('Included in the capitulation');
+    U.washington.moveTo(-40, 230, 8);  U.washington.setStatus('Receiving the surrender');
+    U.rochambeau.moveTo(-140, 230, 8); U.rochambeau.setStatus('Receiving the surrender');
+    U.usInf.moveTo(40, 190, 8);    U.usInf.setStatus('Lining the surrender road');
+    U.frInf.moveTo(-180, 175, 8);  U.frInf.setStatus('Lining the surrender road');
+    U.hamilton.moveTo(150, -62, 5); U.hamilton.setStatus('Holding Redoubt 10');
+    U.usArt.setStatus('Guns silent');
+    U.frArt.setStatus('Guns silent');
+    U.deGrasse.setStatus('Victorious — bay secured');
+    U.frFleet.setStatus('Blockade complete');
+    setBars(5, 10, 100, 100);
+  },
+  triggers: [
+    { at: 7, fn(){
+        surrenderFlag.visible = true;
+        document.getElementById('act-event').textContent =
+          'White flag over the works — firing ceases along the whole line'; } },
+    { at: 16, fn(){ victoryBanner.classList.add('visible');
+        document.getElementById('act-event').textContent =
+          'The garrison marches out — bands play "The World Turned Upside Down" (tradition)'; } },
+    { at: 23, fn(){
+        U.cornwallis.setStatus('Capitulated — claims illness, sends O\'Hara');
+        setFires([]); } }
+  ]
+}];
+
+/* =====================================================================
+   SECTION 8 : UI WIRING, CAMERA DIRECTOR & PLAYBACK
+   ===================================================================== */
+let actIndex = -1;
+let actT = 0;
+let camMode = 'cinematic';
+let firedTriggers = new Set();
+let camCurvePos = null, camCurveLook = null, camPathDur = 1;
+
+const elActLabel = document.getElementById('act-label');
+const elActTitle = document.getElementById('act-title');
+const elActDesc  = document.getElementById('act-desc');
+const elActEvent = document.getElementById('act-event');
+const elProgress = document.getElementById('act-progress-fill');
+
+const tl = document.getElementById('timeline');
+ACTS.forEach((act, i) => {
+  const b = document.createElement('button');
+  b.className = 'act-btn';
+  b.innerHTML = `<span class="num">ACT ${act.id}</span>${act.title}`;
+  b.addEventListener('click', () => { setAct(i); });
+  tl.appendChild(b);
+});
+
+function buildCameraPath(act){
+  const ps = [], ls = [];
+  for(const k of act.camera){
+    ps.push(new THREE.Vector3(k[0], k[1], k[2]));
+    ls.push(new THREE.Vector3(k[3], k[4], k[5]));
+  }
+  camCurvePos = ps.length > 1 ? new THREE.CatmullRomCurve3(ps, false, 'centripetal', 0.6) : { getPoint: () => ps[0] };
+  camCurveLook = ls.length > 1 ? new THREE.CatmullRomCurve3(ls, false, 'centripetal', 0.6) : { getPoint: () => ls[0] };
+  camPathDur = act.duration * 0.92;
+}
+
+function setAct(i){
+  actIndex = ((i % ACTS.length) + ACTS.length) % ACTS.length;
+  const act = ACTS[actIndex];
+  actT = 0;
+  firedTriggers = new Set();
+  act.enter();
+  buildCameraPath(act);
+  elActLabel.textContent = 'ACT ' + act.id + ' OF ' + ACTS.length;
+  elActTitle.textContent = act.title;
+  elActDesc.textContent = act.desc;
+  elActEvent.textContent = act.event;
+  document.querySelectorAll('.act-btn').forEach((b, j) => b.classList.toggle('active', j === actIndex));
+  infoCard.classList.remove('visible');
+}
+
+/* transport buttons */
+const btnPlay = document.getElementById('btn-play');
+const btnCam  = document.getElementById('btn-camera');
+function setPlaying(v){
+  playing = v;
+  btnPlay.textContent = v ? '⏸ Pause' : '▶ Play';
+  btnPlay.classList.toggle('toggled', v);
+}
+function setSpeed(s){
+  simSpeed = s;
+  document.querySelectorAll('.speed-btn').forEach(b =>
+    b.classList.toggle('toggled', parseInt(b.dataset.speed, 10) === s));
+}
+document.querySelectorAll('.speed-btn').forEach(b =>
+  b.addEventListener('click', () => setSpeed(parseInt(b.dataset.speed, 10))));
+function setCamMode(m){
+  camMode = m;
+  const cine = m === 'cinematic';
+  btnCam.textContent = cine ? '🎬 Cinematic Camera' : '🕹 Free Camera';
+  btnCam.classList.toggle('toggled', cine);
+  document.body.classList.toggle('cinematic', cine);
+  controls.enabled = !cine;
+}
+btnPlay.addEventListener('click', () => setPlaying(!playing));
+btnCam.addEventListener('click', () => setCamMode(camMode === 'cinematic' ? 'free' : 'cinematic'));
+document.getElementById('btn-prev').addEventListener('click', () => setAct(actIndex - 1));
+document.getElementById('btn-next').addEventListener('click', () => setAct(actIndex + 1));
+addEventListener('keydown', (e) => {
+  if(e.key === ' '){ e.preventDefault(); setPlaying(!playing); }
+  if(e.key === 'ArrowRight') setAct(actIndex + 1);
+  if(e.key === 'ArrowLeft') setAct(actIndex - 1);
+  if(e.key.toLowerCase() === 'c') setCamMode(camMode === 'cinematic' ? 'free' : 'cinematic');
+  if(['1','2','3','4'].includes(e.key)) setSpeed(parseInt(e.key, 10));
+});
+
+/* playback + camera director */
+const camPosNow = new THREE.Vector3();
+const camLookNow = new THREE.Vector3(0, 20, 0);
+updateHooks.push((dt) => {
+  if(actIndex < 0) return;
+  const act = ACTS[actIndex];
+  actT += dt;                       // dt is 0 while paused — everything freezes
+  for(let k = 0; k < (act.triggers?.length ?? 0); k++){
+    const tr = act.triggers[k];
+    if(actT >= tr.at && !firedTriggers.has(k)){ firedTriggers.add(k); tr.fn(); }
+  }
+  elProgress.style.width = Math.min(100, actT / act.duration * 100) + '%';
+  if(actT >= act.duration) setAct(actIndex + 1);
+  if(camMode === 'cinematic'){
+    const k = Math.min(1, actT / camPathDur);
+    camPosNow.copy(camCurvePos.getPoint(k));
+    camLookNow.lerp(camCurveLook.getPoint(k), Math.min(1, dt * 5));
+    camera.position.lerp(camPosNow, Math.min(1, dt * 2.2));
+    camera.lookAt(camLookNow);
+    controls.target.copy(camLookNow);
+  }
+});
+
+/* boot (?act=N deep-links into a chapter, &t=S jumps mid-act) */
+setCamMode('cinematic');
+setPlaying(true);
+setSpeed(1);
+const bootParams = new URLSearchParams(location.search);
+const actParam = parseInt(bootParams.get('act'), 10);
+if(actParam >= 1 && actParam <= ACTS.length){
+  setAct(actParam - 1);
+  finishLinesInstantly();
+  const tParam = parseFloat(bootParams.get('t'));
+  if(tParam > 0) actT = Math.min(tParam, ACTS[actIndex].duration - 0.5);
+  camera.position.copy(camCurvePos.getPoint(Math.min(1, actT / camPathDur)));
+} else {
+  setAct(0);
+}
+
+/* =====================================================================
+   SECTION 9 : MAIN LOOP
+   ===================================================================== */
+function animate(){
+  requestAnimationFrame(animate);
+  const rawDt = Math.min(clock.getDelta(), 0.05);
+  const dt = playing ? rawDt * simSpeed : 0;   // frozen while paused
+  simT += dt;
+  const t = simT;
+
+  lighting.sky.lerp(lighting.targetSky, dt*1.2);
+  lighting.sunColor.lerp(lighting.targetSunColor, dt*1.2);
+  lighting.sunIntensity += (lighting.targetSunIntensity - lighting.sunIntensity)*dt*1.2;
+  lighting.hemiIntensity += (lighting.targetHemiIntensity - lighting.hemiIntensity)*dt*1.2;
+  scene.background.copy(lighting.sky);
+  scene.fog.color.copy(lighting.sky);
+  sun.color.copy(lighting.sunColor);
+  sun.intensity = lighting.sunIntensity;
+  hemi.intensity = lighting.hemiIntensity;
+
+  for(const fn of updateHooks) fn(dt, t);
+
+  controls.update();
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  labelRenderer.setSize(innerWidth, innerHeight);
+});
+
+document.getElementById('loader').classList.add('done');
+animate();
+</script>
+</body>
+</html>

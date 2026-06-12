@@ -1,4 +1,16 @@
-# The Battle of Alesia — 52 BCE | Interactive 3D Battle Documentary
+# Interactive 3D Battle Documentaries
+
+Two single-file Three.js battle reconstructions, styled as TV history
+specials. No build step — each battle is one HTML file with CDN imports.
+
+| Battle | Live demo |
+|---|---|
+| ⚔ The Battle of Alesia — 52 BCE | https://yitachen.github.io/battle-of-alesia-3d/ |
+| 🇺🇸⚜ The Siege of Yorktown — 1781 | https://yitachen.github.io/battle-of-alesia-3d/yorktown.html |
+
+---
+
+# The Battle of Alesia — 52 BCE
 
 **Live demo: https://yitachen.github.io/battle-of-alesia-3d/**
 
@@ -60,3 +72,42 @@ are marked **approximate / estimated** in the UI; the ancient claim of a
 stylized for legibility, not archaeologically exact, but follows the historical
 logic: the town on a central plateau, the Roman double line around it, and the
 relief army arriving across the western plain.
+
+---
+
+# The Siege of Yorktown — 1781
+
+**Live demo: https://yitachen.github.io/battle-of-alesia-3d/yorktown.html**
+
+![Act 4 — the allied siege begins: Yorktown under bombardment from the First Parallel, ringed by the British works, the York River and Gloucester Point behind](docs/screenshot-yorktown.png)
+
+The decisive siege of the American War of Independence (`yorktown.html`,
+same single-file / CDN approach). Lord Cornwallis is trapped on the York
+peninsula — besieged by land by Washington's and Rochambeau's allied army,
+and sealed off by sea by Admiral de Grasse's French fleet.
+
+## Features
+
+- **3D coastal battlefield** — the York River, Chesapeake Bay, Yorktown on
+  its bluff, Gloucester Point across the river, marshy creeks, farmland
+  siege ground; all key locations labelled
+- **Four factions** with flags, leader labels and clickable info cards:
+  Continental Army (blue, Washington, Hamilton, Knox), French Army
+  (white/gold, Rochambeau, Lauzun), French Navy (purple, de Grasse),
+  British Army (red, Cornwallis, Tarleton)
+- **Land + sea encirclement** — allied siege parallels dug progressively on
+  land, and a French blockade line of square-rigged ships of the line with a
+  dashed exclusion arc sealing the river mouth
+- **Seven-act timeline**: fortification → allied march south → naval
+  blockade → First Parallel → Second Parallel → night assault on
+  Redoubts 9 & 10 → surrender
+- **18th-century siege effects** — cannon and mortar arcs with muzzle
+  flashes and impact bursts, naval broadsides, musket volleys, burning
+  buildings and ships, night assault with bayonet-charge arrows
+- **Live siege status** — British Supplies, British Morale, Allied
+  Artillery Pressure, Naval Blockade
+
+Controls are identical to Alesia (see table above). Figures are marked
+**approximate / estimated**; the geography is stylized but preserves the
+strategic structure: the army pinned against the river, the allies in a
+land arc, the fleet closing the sea.
