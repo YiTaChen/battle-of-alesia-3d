@@ -3,17 +3,22 @@
 Three single-file Three.js battle reconstructions, styled as TV history
 specials. No build step — each battle is one HTML file with CDN imports.
 
+**🏛 Main menu (start here): https://yitachen.github.io/battle-of-alesia-3d/**
+
 | Battle | Live demo |
 |---|---|
-| ⚔ The Battle of Alesia — 52 BCE | https://yitachen.github.io/battle-of-alesia-3d/ |
-| 🇺🇸⚜ The Siege of Yorktown — 1781 | https://yitachen.github.io/battle-of-alesia-3d/yorktown.html |
+| ⚔ The Battle of Alesia — 52 BCE | https://yitachen.github.io/battle-of-alesia-3d/alesia.html |
 | 🔥🌊 The Battle of Red Cliffs — 208 CE | https://yitachen.github.io/battle-of-alesia-3d/redcliffs.html |
+| 🇺🇸⚜ The Siege of Yorktown — 1781 | https://yitachen.github.io/battle-of-alesia-3d/yorktown.html |
+
+Every battle also has a **⚔ Battles** button in its control deck to jump
+straight to any other battle (each battle restarts from Act 1).
 
 ---
 
 # The Battle of Alesia — 52 BCE
 
-**Live demo: https://yitachen.github.io/battle-of-alesia-3d/**
+**Live demo: https://yitachen.github.io/battle-of-alesia-3d/alesia.html**
 
 ![Act 2 — Caesar begins the siege: the Alesia oppidum ringed by Roman fortifications, with the documentary UI, six-act timeline and playback controls](docs/screenshot.png)
 
@@ -24,7 +29,7 @@ surrounded when a massive Gallic relief army arrives, leaving the Romans
 fighting back-to-back between two enemy forces inside their own double ring of
 fortifications.
 
-Built as a **single `index.html`** with [Three.js](https://threejs.org/) loaded
+Built as a **single `alesia.html`** with [Three.js](https://threejs.org/) loaded
 from CDN (no build step): OrbitControls for free camera, CSS2DRenderer for map
 and unit labels.
 

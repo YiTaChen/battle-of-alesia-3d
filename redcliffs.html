@@ -170,6 +170,19 @@
   .unit-label.sun{border-color:var(--sun);color:#ffc4c4;}
   .unit-label.liu{border-color:var(--liu);color:#bff5cd;}
 
+  /* battle switcher (popup above the control deck) */
+  #bs-wrap{position:relative;}
+  #bs-menu{position:absolute;bottom:120%;left:0;background:var(--panel);
+    border:1px solid var(--panel-border);border-radius:9px;padding:6px;display:none;
+    min-width:225px;backdrop-filter:blur(8px);z-index:60;box-shadow:0 10px 30px rgba(0,0,0,0.6);}
+  #bs-wrap.open #bs-menu{display:block;}
+  #bs-menu a{display:block;padding:7px 11px;color:#cfc9bd;text-decoration:none;
+    font-size:12px;border-radius:6px;letter-spacing:0.5px;white-space:nowrap;}
+  #bs-menu a:hover{background:rgba(255,255,255,0.12);color:#fff;}
+  #bs-menu a.current{color:var(--gold);pointer-events:none;opacity:0.65;}
+  #bs-menu .bs-head{font-size:9.5px;letter-spacing:2px;color:#8d887c;
+    text-transform:uppercase;padding:4px 11px 5px;}
+
   /* loading screen */
   #loader{position:fixed;inset:0;background:#0a0c10;z-index:100;display:flex;
     flex-direction:column;align-items:center;justify-content:center;gap:14px;
@@ -263,6 +276,16 @@
 <div id="control-deck">
   <div id="timeline"></div>
   <div id="transport">
+    <div id="bs-wrap">
+      <button class="ctl-btn" id="bs-btn" title="Switch battle">⚔ Battles ▾</button>
+      <div id="bs-menu">
+        <div class="bs-head">Interactive 3D Battle Documentaries</div>
+        <a href="./">🏛 Main Menu — all battles</a>
+        <a href="alesia.html">⚔ Alesia — 52 BCE</a>
+        <a href="redcliffs.html" class="current">🔥 Red Cliffs — 208 CE</a>
+        <a href="yorktown.html">🎆 Yorktown — 1781</a>
+      </div>
+    </div>
     <button class="ctl-btn" id="btn-prev" title="Previous act">⏮ Prev</button>
     <button class="ctl-btn" id="btn-play" title="Auto play">▶ Auto Play</button>
     <button class="ctl-btn" id="btn-next" title="Next act">Next ⏭</button>
@@ -2146,6 +2169,14 @@ addEventListener('resize', () => {
 
 document.getElementById('loader').classList.add('done');
 animate();
+</script>
+<script>
+(function(){
+  const w = document.getElementById('bs-wrap');
+  document.getElementById('bs-btn').addEventListener('click',
+    (e) => { e.stopPropagation(); w.classList.toggle('open'); });
+  addEventListener('click', () => w.classList.remove('open'));
+})();
 </script>
 </body>
 </html>
