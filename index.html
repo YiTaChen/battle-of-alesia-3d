@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Interactive 3D Battle Documentaries</title>
+<title>Interactive 3D Battle Documentaries — Alesia · Red Cliffs · Yorktown</title>
 <style>
   :root{
     --gold:#d8b25c;
@@ -11,105 +11,256 @@
     --panel-border:rgba(255,255,255,0.14);
   }
   *{margin:0;padding:0;box-sizing:border-box;}
-  body{min-height:100vh;color:#e8e6e0;
+  html{scroll-behavior:smooth;}
+  body{min-height:100vh;color:#e8e6e0;overflow-x:hidden;
     font-family:"Segoe UI",Helvetica,Arial,sans-serif;
-    background:#0a0c10 radial-gradient(ellipse at 50% -10%, #1c2230 0%, #0a0c10 60%);}
-  header{text-align:center;padding:52px 18px 10px;}
-  header h1{font-family:Georgia,"Times New Roman",serif;color:var(--gold);
-    letter-spacing:5px;font-size:clamp(22px,4vw,36px);text-transform:uppercase;}
-  header p{color:#b8b2a4;font-size:13px;margin-top:10px;letter-spacing:1px;
-    max-width:640px;margin-left:auto;margin-right:auto;line-height:1.6;}
-  .rule{width:120px;height:2px;background:var(--gold);opacity:0.6;margin:18px auto 0;}
+    background:#07090d;}
 
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));
-    gap:24px;max-width:1180px;margin:34px auto;padding:0 22px;}
+  /* ==================== HERO ==================== */
+  #hero{position:relative;min-height:62vh;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;
+    padding:70px 18px 56px;
+    background:radial-gradient(ellipse at 50% -20%, #232b3d 0%, #0d111a 55%, #07090d 100%);}
+  #embers{position:absolute;inset:0;pointer-events:none;}
+  #hero > *{position:relative;}
+  .kicker{font-size:11px;letter-spacing:5px;color:#8d887c;text-transform:uppercase;}
+  #hero h1{font-family:Georgia,"Times New Roman",serif;color:var(--gold);
+    letter-spacing:6px;font-size:clamp(24px,4.6vw,44px);text-transform:uppercase;
+    margin:14px 0 4px;text-shadow:0 2px 30px rgba(216,178,92,0.25);}
+  #hero h1 small{display:block;font-size:0.42em;color:#cfc9bb;letter-spacing:4px;margin-top:10px;}
+  #hero p{color:#b8b2a4;font-size:13.5px;margin-top:16px;letter-spacing:0.5px;
+    max-width:620px;line-height:1.7;}
+  .rule{width:130px;height:2px;background:var(--gold);opacity:0.65;margin:26px auto 0;}
+
+  /* ==================== TIMELINE STRIP ==================== */
+  #timeline-strip{max-width:860px;margin:-26px auto 0;padding:0 22px;position:relative;}
+  .tl-line{height:2px;background:linear-gradient(90deg, transparent, rgba(216,178,92,0.55) 12%,
+    rgba(216,178,92,0.55) 88%, transparent);}
+  .tl-marks{display:flex;justify-content:space-between;transform:translateY(-7px);}
+  .tl-mark{text-align:center;width:33%;text-decoration:none;color:inherit;}
+  .tl-dot{width:12px;height:12px;border-radius:50%;background:#0d111a;border:2px solid var(--gold);
+    margin:0 auto;transition:all .2s;}
+  .tl-mark:hover .tl-dot{background:var(--gold);box-shadow:0 0 14px rgba(216,178,92,0.8);}
+  .tl-era{font-size:11px;letter-spacing:2px;color:var(--gold);margin-top:8px;font-family:Georgia,serif;}
+  .tl-name{font-size:10px;color:#8d887c;letter-spacing:1px;margin-top:2px;text-transform:uppercase;}
+
+  /* ==================== BATTLE CARDS ==================== */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+    gap:26px;max-width:1220px;margin:44px auto 10px;padding:0 22px;}
   .card{display:flex;flex-direction:column;background:var(--panel);
-    border:1px solid var(--panel-border);border-radius:13px;overflow:hidden;
-    text-decoration:none;color:inherit;
-    transition:transform .22s ease, box-shadow .22s ease, border-color .22s ease;}
-  .card:hover{transform:translateY(-5px);border-color:var(--gold);
-    box-shadow:0 14px 44px rgba(216,178,92,0.16);}
-  .card img{width:100%;aspect-ratio:16/10;object-fit:cover;display:block;
-    border-bottom:1px solid var(--panel-border);}
-  .body{padding:16px 18px 18px;flex:1;display:flex;flex-direction:column;gap:9px;}
-  .era{font-size:10.5px;letter-spacing:2.5px;color:var(--gold);text-transform:uppercase;}
-  .card h2{font-family:Georgia,serif;font-size:21px;letter-spacing:0.5px;}
+    border:1px solid var(--panel-border);border-radius:14px;overflow:hidden;
+    transition:transform .24s ease, box-shadow .24s ease, border-color .24s ease;}
+  .card:hover{transform:translateY(-6px);border-color:var(--gold);
+    box-shadow:0 16px 50px rgba(216,178,92,0.17);}
+  .cover{display:block;position:relative;overflow:hidden;aspect-ratio:16/9.5;}
+  .cover img{width:100%;height:100%;object-fit:cover;display:block;
+    transition:transform .5s ease;}
+  .card:hover .cover img{transform:scale(1.05);}
+  .cover .era-badge{position:absolute;top:12px;left:12px;background:rgba(8,10,14,0.82);
+    border:1px solid var(--gold);color:#ffe9bb;font-size:10.5px;letter-spacing:2px;
+    padding:4px 11px;border-radius:14px;text-transform:uppercase;backdrop-filter:blur(4px);}
+  .cover::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(180deg, transparent 60%, rgba(7,9,13,0.85));}
+  .cover .vs{position:absolute;left:14px;bottom:10px;font-size:11px;color:#cfc9bd;
+    letter-spacing:1px;z-index:1;text-shadow:0 1px 4px #000;}
+  .body{padding:16px 18px 18px;flex:1;display:flex;flex-direction:column;gap:10px;}
+  .card h2{font-family:Georgia,serif;font-size:22px;letter-spacing:0.5px;}
+  .card h2 a{color:inherit;text-decoration:none;}
+  .card h2 a:hover{color:#ffe9bb;}
   .desc{font-size:12.5px;line-height:1.55;color:#cfc9bd;flex:1;}
   .tags{display:flex;flex-wrap:wrap;gap:5px;}
   .tag{font-size:10px;padding:2.5px 9px;border:1px solid rgba(255,255,255,0.18);
     border-radius:11px;color:#bdb7aa;letter-spacing:0.5px;}
-  .watch{margin-top:6px;text-align:center;background:rgba(216,178,92,0.16);
-    border:1px solid var(--gold);color:#ffe9bb;padding:9px;border-radius:8px;
-    letter-spacing:2px;font-size:12.5px;text-transform:uppercase;}
-  .card:hover .watch{background:rgba(216,178,92,0.3);}
 
-  footer{text-align:center;color:#8d887c;font-size:11px;line-height:1.8;
-    padding:14px 22px 40px;}
+  .hl-head{font-size:9.5px;letter-spacing:2px;color:#8d887c;text-transform:uppercase;
+    margin-top:2px;}
+  .highlights{display:flex;flex-direction:column;gap:4px;}
+  .highlights a{display:flex;justify-content:space-between;align-items:center;
+    font-size:11.5px;color:#cfc9bd;text-decoration:none;padding:6px 10px;
+    border:1px solid rgba(255,255,255,0.10);border-radius:7px;transition:all .15s;}
+  .highlights a:hover{border-color:var(--gold);color:#ffe9bb;background:rgba(216,178,92,0.08);}
+  .highlights .act-no{font-size:9.5px;color:#8d887c;letter-spacing:1.5px;}
+
+  .watch{display:block;margin-top:8px;text-align:center;background:rgba(216,178,92,0.16);
+    border:1px solid var(--gold);color:#ffe9bb;padding:10px;border-radius:9px;
+    letter-spacing:2.5px;font-size:13px;text-transform:uppercase;text-decoration:none;
+    transition:background .2s;}
+  .watch:hover{background:rgba(216,178,92,0.34);}
+
+  /* ==================== FOOTER ==================== */
+  footer{text-align:center;color:#8d887c;font-size:11px;line-height:1.9;
+    padding:30px 22px 46px;}
   footer b{color:#bdb7aa;font-weight:600;}
+  footer .keys{display:inline-flex;gap:14px;flex-wrap:wrap;justify-content:center;margin:6px 0 10px;}
+  footer .key{border:1px solid rgba(255,255,255,0.16);border-radius:6px;padding:2px 9px;color:#bdb7aa;}
+
+  @media (max-width:700px){
+    #timeline-strip{display:none;}
+    #hero{min-height:48vh;}
+  }
 </style>
 </head>
 <body>
 
-<header>
-  <h1>Interactive 3D Battle Documentaries</h1>
-  <p>Three decisive battles, reconstructed as TV-style history specials —
-     cinematic camera, interactive timeline, moving armies and fleets,
-     period effects. Pick a battlefield.</p>
+<!-- ==================== HERO ==================== -->
+<section id="hero">
+  <canvas id="embers"></canvas>
+  <div class="kicker">An Interactive History Series</div>
+  <h1>3D Battle Documentaries
+    <small>Alesia &middot; Red Cliffs &middot; Yorktown</small></h1>
+  <p>Three decisive battles, two thousand years apart, reconstructed as cinematic
+     3D history specials — auto-directed cameras, interactive timelines, moving
+     armies and fleets, siege works, fire and wind. Pick a battlefield, or jump
+     straight to a famous moment.</p>
   <div class="rule"></div>
-</header>
+</section>
 
+<!-- ==================== TIMELINE ==================== -->
+<div id="timeline-strip">
+  <div class="tl-line"></div>
+  <div class="tl-marks">
+    <a class="tl-mark" href="alesia.html">
+      <div class="tl-dot"></div><div class="tl-era">52 BCE</div><div class="tl-name">Alesia</div></a>
+    <a class="tl-mark" href="redcliffs.html">
+      <div class="tl-dot"></div><div class="tl-era">208 CE</div><div class="tl-name">Red Cliffs</div></a>
+    <a class="tl-mark" href="yorktown.html">
+      <div class="tl-dot"></div><div class="tl-era">1781</div><div class="tl-name">Yorktown</div></a>
+  </div>
+</div>
+
+<!-- ==================== CARDS ==================== -->
 <div class="grid">
 
-  <a class="card" href="alesia.html">
-    <img src="docs/screenshot.png" alt="The Battle of Alesia — the oppidum ringed by Roman siege lines">
+  <div class="card">
+    <a class="cover" href="alesia.html">
+      <img src="docs/screenshot.png" alt="The Battle of Alesia — the oppidum ringed by Roman siege lines">
+      <span class="era-badge">52 BCE &middot; Gaul</span>
+      <span class="vs">Caesar vs. Vercingetorix</span>
+    </a>
     <div class="body">
-      <div class="era">52 BCE &mdash; Gaul</div>
-      <h2>The Battle of Alesia</h2>
-      <div class="desc">Caesar besieges Vercingetorix inside a hilltop stronghold —
-        then is himself surrounded by a vast relief army. The Romans fight
-        back-to-back inside their own double ring of fortifications.</div>
-      <div class="tags"><span class="tag">double siege lines</span><span class="tag">6 acts</span>
-        <span class="tag">night assault</span><span class="tag">cavalry counterstroke</span></div>
-      <div class="watch">▶ Watch the battle</div>
+      <h2><a href="alesia.html">The Battle of Alesia</a></h2>
+      <div class="desc">Caesar besieges a hilltop stronghold — then is himself surrounded
+        by a vast relief army. Rome fights back-to-back inside its own double ring
+        of fortifications, and the war for Gaul is decided in one afternoon.</div>
+      <div class="tags"><span class="tag">double siege rings</span><span class="tag">6 acts</span>
+        <span class="tag">dusk assault</span><span class="tag">cavalry counterstroke</span></div>
+      <div class="hl-head">Jump to a moment</div>
+      <div class="highlights">
+        <a href="alesia.html?act=3">25 miles of fortifications rise <span class="act-no">ACT 3</span></a>
+        <a href="alesia.html?act=5">The double assault at dusk <span class="act-no">ACT 5</span></a>
+        <a href="alesia.html?act=6">Vercingetorix surrenders <span class="act-no">ACT 6</span></a>
+      </div>
+      <a class="watch" href="alesia.html">▶ Watch from the start</a>
     </div>
-  </a>
+  </div>
 
-  <a class="card" href="redcliffs.html">
-    <img src="docs/screenshot-redcliffs.png" alt="The Battle of Red Cliffs — the chained fleet ablaze on the night Yangtze">
+  <div class="card">
+    <a class="cover" href="redcliffs.html">
+      <img src="docs/screenshot-redcliffs.png" alt="The Battle of Red Cliffs — the chained fleet ablaze on the night Yangtze">
+      <span class="era-badge">208 CE &middot; The Yangtze</span>
+      <span class="vs">Sun Quan &amp; Liu Bei vs. Cao Cao</span>
+    </a>
     <div class="body">
-      <div class="era">208 CE &mdash; The Yangtze</div>
-      <h2>The Battle of Red Cliffs</h2>
-      <div class="desc">Cao Cao&rsquo;s chained armada against the outnumbered Sun&ndash;Liu
-        alliance: a false surrender, a wind that turns in the night, fire that
-        walks the chains — and the Huarong road epilogue.</div>
+      <h2><a href="redcliffs.html">The Battle of Red Cliffs</a></h2>
+      <div class="desc">Cao Cao&rsquo;s chained armada against an alliance a quarter its
+        size: a false surrender, a wind that dies and turns in the night, fire
+        that walks the chains — and the Huarong road epilogue.</div>
       <div class="tags"><span class="tag">chained fleet</span><span class="tag">7 acts</span>
         <span class="tag">fire ships</span><span class="tag">east wind</span><span class="tag">ship damage states</span></div>
-      <div class="watch">▶ Watch the battle</div>
+      <div class="hl-head">Jump to a moment</div>
+      <div class="highlights">
+        <a href="redcliffs.html?act=3">The fleet is chained together <span class="act-no">ACT 3</span></a>
+        <a href="redcliffs.html?act=5">The east wind &amp; the fire attack <span class="act-no">ACT 5</span></a>
+        <a href="redcliffs.html?act=7">Guan Yu at the Huarong road <span class="act-no">ACT 7</span></a>
+      </div>
+      <a class="watch" href="redcliffs.html">▶ Watch from the start</a>
     </div>
-  </a>
+  </div>
 
-  <a class="card" href="yorktown.html">
-    <img src="docs/screenshot-yorktown.png" alt="The Siege of Yorktown — the town under bombardment from the First Parallel">
+  <div class="card">
+    <a class="cover" href="yorktown.html">
+      <img src="docs/screenshot-yorktown.png" alt="The Siege of Yorktown — the town under bombardment from the First Parallel">
+      <span class="era-badge">1781 &middot; Virginia</span>
+      <span class="vs">Washington &amp; Rochambeau vs. Cornwallis</span>
+    </a>
     <div class="body">
-      <div class="era">1781 &mdash; Virginia</div>
-      <h2>The Siege of Yorktown</h2>
-      <div class="desc">Cornwallis trapped on the York peninsula — Washington and
-        Rochambeau closing by land, de Grasse&rsquo;s fleet sealing the sea. The
-        siege that decided the American War of Independence.</div>
+      <h2><a href="yorktown.html">The Siege of Yorktown</a></h2>
+      <div class="desc">Cornwallis trapped on the York peninsula — allied armies closing
+        by land, the French fleet sealing the sea. The textbook siege that decided
+        the American War of Independence.</div>
       <div class="tags"><span class="tag">land + sea blockade</span><span class="tag">7 acts</span>
         <span class="tag">siege parallels</span><span class="tag">night storm of the redoubts</span></div>
-      <div class="watch">▶ Watch the battle</div>
+      <div class="hl-head">Jump to a moment</div>
+      <div class="highlights">
+        <a href="yorktown.html?act=3">The French fleet seals the bay <span class="act-no">ACT 3</span></a>
+        <a href="yorktown.html?act=4">The bombardment opens <span class="act-no">ACT 4</span></a>
+        <a href="yorktown.html?act=6">Storming Redoubts 9 &amp; 10 <span class="act-no">ACT 6</span></a>
+      </div>
+      <a class="watch" href="yorktown.html">▶ Watch from the start</a>
     </div>
-  </a>
+  </div>
 
 </div>
 
+<!-- ==================== FOOTER ==================== -->
 <footer>
-  <b>Controls in every battle:</b> act timeline &middot; auto-play / pause (Space) &middot;
-  1&times;&ndash;4&times; speed &middot; cinematic / free camera (C) &middot; click units for info cards<br>
-  Troop figures are approximate / estimated; dramatized episodes are labelled.
-  Built with Three.js — single HTML file per battle, no build step.
+  <b>Controls in every battle</b><br>
+  <span class="keys">
+    <span class="key">Space — pause / play</span>
+    <span class="key">1–4 — speed</span>
+    <span class="key">← → — acts</span>
+    <span class="key">C — free camera</span>
+    <span class="key">click units — info cards</span>
+  </span><br>
+  Troop figures are approximate / estimated; dramatized episodes (e.g. <i>Romance of the
+  Three Kingdoms</i> material) are labelled in each battle.<br>
+  Built with Three.js — one self-contained HTML file per battle, no build step.
+  Use the <b>⚔ Battles</b> button inside any battle to switch.
 </footer>
+
+<script>
+/* drifting embers behind the hero — pure canvas, no dependencies */
+(function(){
+  const cv = document.getElementById('embers');
+  const ctx = cv.getContext('2d');
+  let W, H, parts = [];
+  function resize(){
+    W = cv.width = cv.offsetWidth;
+    H = cv.height = cv.offsetHeight;
+  }
+  resize();
+  addEventListener('resize', resize);
+  const N = 70;
+  for(let i = 0; i < N; i++){
+    parts.push({
+      x: Math.random() * 2000, y: Math.random() * 1200,
+      r: 0.6 + Math.random() * 1.8,
+      vx: -0.12 - Math.random() * 0.25,
+      vy: -0.08 - Math.random() * 0.22,
+      ph: Math.random() * 6.28,
+      gold: Math.random() < 0.7
+    });
+  }
+  let t = 0;
+  (function tick(){
+    requestAnimationFrame(tick);
+    t += 0.016;
+    ctx.clearRect(0, 0, W, H);
+    for(const p of parts){
+      p.x += p.vx + Math.sin(t * 0.7 + p.ph) * 0.08;
+      p.y += p.vy;
+      if(p.y < -8 || p.x < -8){ p.x = Math.random() * W + 20; p.y = H + 8; }
+      const a = 0.16 + 0.14 * Math.sin(t * 1.4 + p.ph);
+      ctx.beginPath();
+      ctx.arc(p.x % (W + 30), p.y, p.r, 0, 6.28);
+      ctx.fillStyle = p.gold
+        ? `rgba(216,178,92,${a})`
+        : `rgba(140,170,210,${a * 0.8})`;
+      ctx.fill();
+    }
+  })();
+})();
+</script>
 
 </body>
 </html>
