@@ -53,9 +53,16 @@
   .card:hover{transform:translateY(-6px);border-color:var(--gold);
     box-shadow:0 16px 50px rgba(216,178,92,0.17);}
   .cover{display:block;position:relative;overflow:hidden;aspect-ratio:16/9.5;}
-  .cover img{width:100%;height:100%;object-fit:cover;display:block;
-    transition:transform .5s ease;}
-  .card:hover .cover img{transform:scale(1.05);}
+  .cover .slide{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+    display:block;opacity:0;transition:opacity .9s ease, transform .5s ease;}
+  .cover .slide.active{opacity:1;}
+  .card:hover .cover .slide.active{transform:scale(1.05);}
+  .cover .dots{position:absolute;right:12px;bottom:10px;display:flex;gap:7px;z-index:2;}
+  .cover .dot{width:10px;height:10px;border-radius:50%;padding:0;cursor:pointer;
+    border:1px solid rgba(255,255,255,0.75);background:rgba(0,0,0,0.4);transition:all .2s;}
+  .cover .dot:hover{transform:scale(1.25);}
+  .cover .dot.active{background:var(--gold);border-color:var(--gold);
+    box-shadow:0 0 8px rgba(216,178,92,0.8);}
   .cover .era-badge{position:absolute;top:12px;left:12px;background:rgba(8,10,14,0.82);
     border:1px solid var(--gold);color:#ffe9bb;font-size:10.5px;letter-spacing:2px;
     padding:4px 11px;border-radius:14px;text-transform:uppercase;backdrop-filter:blur(4px);}
@@ -133,9 +140,13 @@
 
   <div class="card">
     <a class="cover" href="alesia.html">
-      <img src="docs/screenshot.png" alt="The Battle of Alesia — the oppidum ringed by Roman siege lines">
+      <img class="slide active" src="docs/screenshot.png" alt="The Battle of Alesia — the oppidum ringed by Roman siege lines">
+      <img class="slide" src="docs/art-alesia.jpg" loading="lazy"
+        alt="Vercingetorix Throws Down His Arms at the Feet of Julius Caesar — Lionel Royer, 1899 (public domain)">
       <span class="era-badge">52 BCE &middot; Gaul</span>
       <span class="vs">Caesar vs. Vercingetorix</span>
+      <span class="dots"><button class="dot active" aria-label="3D scene"></button><button
+        class="dot" aria-label="Royer painting, 1899"></button></span>
     </a>
     <div class="body">
       <h2><a href="alesia.html">The Battle of Alesia</a></h2>
@@ -156,9 +167,13 @@
 
   <div class="card">
     <a class="cover" href="redcliffs.html">
-      <img src="docs/screenshot-redcliffs.png" alt="The Battle of Red Cliffs — the chained fleet ablaze on the night Yangtze">
+      <img class="slide active" src="docs/screenshot-redcliffs.png" alt="The Battle of Red Cliffs — the chained fleet ablaze on the night Yangtze">
+      <img class="slide" src="docs/art-redcliffs.jpg" loading="lazy" style="object-position:50% 22%"
+        alt="赤壁縱火 — Zhou Yu sets fire at Red Cliffs, Ma Tai (馬駘), early 20th c. (public domain)">
       <span class="era-badge">208 CE &middot; The Yangtze</span>
       <span class="vs">Sun Quan &amp; Liu Bei vs. Cao Cao</span>
+      <span class="dots"><button class="dot active" aria-label="3D scene"></button><button
+        class="dot" aria-label="Ma Tai illustration"></button></span>
     </a>
     <div class="body">
       <h2><a href="redcliffs.html">The Battle of Red Cliffs</a></h2>
@@ -179,9 +194,13 @@
 
   <div class="card">
     <a class="cover" href="yorktown.html">
-      <img src="docs/screenshot-yorktown.png" alt="The Siege of Yorktown — the town under bombardment from the First Parallel">
+      <img class="slide active" src="docs/screenshot-yorktown.png" alt="The Siege of Yorktown — the town under bombardment from the First Parallel">
+      <img class="slide" src="docs/art-yorktown.jpg" loading="lazy"
+        alt="Surrender of Lord Cornwallis — John Trumbull, 1820 (public domain)">
       <span class="era-badge">1781 &middot; Virginia</span>
       <span class="vs">Washington &amp; Rochambeau vs. Cornwallis</span>
+      <span class="dots"><button class="dot active" aria-label="3D scene"></button><button
+        class="dot" aria-label="Trumbull painting, 1820"></button></span>
     </a>
     <div class="body">
       <h2><a href="yorktown.html">The Siege of Yorktown</a></h2>
@@ -215,10 +234,32 @@
   Troop figures are approximate / estimated; dramatized episodes (e.g. <i>Romance of the
   Three Kingdoms</i> material) are labelled in each battle.<br>
   Built with Three.js — one self-contained HTML file per battle, no build step.
-  Use the <b>⚔ Battles</b> button inside any battle to switch.
+  Use the <b>⚔ Battles</b> button inside any battle to switch.<br>
+  Cover art (all public domain, via Wikimedia Commons): Lionel Royer,
+  <i>Vercingetorix Throws Down His Arms&hellip;</i> (1899) &middot; Ma Tai 馬駘,
+  <i>赤壁縱火</i> (early 20th c.) &middot; John Trumbull,
+  <i>Surrender of Lord Cornwallis</i> (1820).
 </footer>
 
 <script>
+/* card cover carousel: auto-rotate 3D scene <-> period artwork; dots switch by hand */
+document.querySelectorAll('.cover').forEach((cover, ci) => {
+  const slides = [...cover.querySelectorAll('.slide')];
+  const dots = [...cover.querySelectorAll('.dot')];
+  if(slides.length < 2) return;
+  let i = 0, timer;
+  function show(n){
+    i = (n + slides.length) % slides.length;
+    slides.forEach((s, k) => s.classList.toggle('active', k === i));
+    dots.forEach((d, k) => d.classList.toggle('active', k === i));
+  }
+  function arm(){ clearInterval(timer); timer = setInterval(() => show(i + 1), 5200 + ci * 700); }
+  dots.forEach((d, k) => d.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation(); show(k); arm();
+  }));
+  arm();
+});
+
 /* drifting embers behind the hero — pure canvas, no dependencies */
 (function(){
   const cv = document.getElementById('embers');
