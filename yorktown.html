@@ -876,6 +876,20 @@ function makeStandard(factionKey, symbol, big = false){
 const clickables = [];
 const allUnits = [];
 
+/* CSS2DRenderer ignores ancestor visibility — cascade it to labels by hand.
+   When showing, a label only reappears if every group between it and g is
+   itself visible (e.g. a hidden surrender flag inside a visible unit). */
+function setGroupVisible(g, v){
+  g.visible = v;
+  g.traverse(o => {
+    if(!o.isCSS2DObject) return;
+    if(!v){ o.visible = false; return; }
+    let p = o.parent, ok = true;
+    while(p && p !== g){ if(p.visible === false){ ok = false; break; } p = p.parent; }
+    o.visible = ok;
+  });
+}
+
 class Unit {
   constructor(opts){
     const f = FACTIONS[opts.faction];
@@ -954,7 +968,7 @@ class Unit {
       this.applyPos();
     }
   }
-  setVisible(v){ this.group.visible = v; }
+  setVisible(v){ setGroupVisible(this.group, v); }
   setStatus(s){ this.status = s; }
 }
 
@@ -1056,7 +1070,7 @@ class Fleet {
       s.rotation.z = Math.sin(t * 0.6 + s.userData.bobPhase) * 0.03;
     }
   }
-  setVisible(v){ this.group.visible = v; }
+  setVisible(v){ setGroupVisible(this.group, v); }
   setStatus(s){ this.status = s; }
 }
 
@@ -1201,7 +1215,7 @@ const surrenderFlag = (() => {
   });
   const y = groundY(-30, 95);
   g.position.set(-30, y, 95);          // on the British rampart facing the parallels
-  g.visible = false;
+  setGroupVisible(g, false);
   scene.add(g);
   return g;
 })();
@@ -1548,7 +1562,7 @@ function stopAllEffects(){
   Object.values(volleys).forEach(v => v.stop());
   Object.values(assaultArrows).forEach(a => a.visible = false);
   setFires([]); setDust([]);
-  surrenderFlag.visible = false;
+  setGroupVisible(surrenderFlag, false);
   victoryBanner.classList.remove('visible');
 }
 
@@ -1844,7 +1858,7 @@ const ACTS = [
   },
   triggers: [
     { at: 7, fn(){
-        surrenderFlag.visible = true;
+        setGroupVisible(surrenderFlag, true);
         document.getElementById('act-event').textContent =
           'White flag over the works — firing ceases along the whole line'; } },
     { at: 16, fn(){ victoryBanner.classList.add('visible');

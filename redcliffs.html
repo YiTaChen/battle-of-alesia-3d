@@ -582,6 +582,20 @@ function makeStandard(factionKey, symbol, big = false){
 
 const clickables = [];
 
+/* CSS2DRenderer ignores ancestor visibility — cascade it to labels by hand.
+   When showing, a label only reappears if every group between it and g is
+   itself visible (e.g. a hidden surrender flag inside a visible unit). */
+function setGroupVisible(g, v){
+  g.visible = v;
+  g.traverse(o => {
+    if(!o.isCSS2DObject) return;
+    if(!v){ o.visible = false; return; }
+    let p = o.parent, ok = true;
+    while(p && p !== g){ if(p.visible === false){ ok = false; break; } p = p.parent; }
+    o.visible = ok;
+  });
+}
+
 class Unit {
   constructor(opts){
     const f = FACTIONS[opts.faction];
@@ -654,7 +668,7 @@ class Unit {
       this.applyPos();
     }
   }
-  setVisible(v){ this.group.visible = v; }
+  setVisible(v){ setGroupVisible(this.group, v); }
   setStatus(s){ this.status = s; }
 }
 
@@ -752,7 +766,7 @@ class Warship {
       s.userData.k = i / 3;
       g.add(s); this.smokes.push(s);
     }
-    this.light = new THREE.PointLight(0xff8a30, 0, big ? 110 : 70, 1.8);
+    this.light = new THREE.PointLight(0xff8a30, 0, big ? 160 : 110, 1.8);
     this.light.position.y = 7;
     this.light.visible = false;          // lit only while burning — keeps the light count low
     g.add(this.light);
@@ -866,7 +880,7 @@ class Warship {
       s.scale.setScalar(9 + k * 26);
       s.material.opacity = 0.36 * (1 - k) * smokeAmt;
     });
-    this.light.intensity = 90 * f * (0.8 + Math.sin(t * 13 + this.idx) * 0.2);
+    this.light.intensity = 170 * f * (0.8 + Math.sin(t * 13 + this.idx) * 0.2);
     // burning ships cast light — including hulls still aflame after charring
     this.light.visible = f > 0.2 && this.state !== 'Destroyed';
   }
@@ -1273,6 +1287,21 @@ for(let i = 0; i < 3; i++)
   spawnAlliedShip('liu', false, 530 + (i%2)*40, 190 + Math.floor(i/2)*44, Math.PI/2 + 0.1,
     'Liu Bei Warship ' + (i+1), 'A vessel of Liu Bei\'s smaller flotilla, holding the downstream wing of the allied line.');
 
+/* labels that sail with the ships, so the attack reads at a glance */
+function attachShipLabel(ship, text, cls){
+  const div = document.createElement('div');
+  div.className = 'unit-label ' + cls;
+  div.textContent = text;
+  div.addEventListener('click', (e) => { e.stopPropagation(); showInfoCard(ship, e); });
+  const lbl = new CSS2DObject(div);
+  lbl.position.set(0, 28, 0);
+  ship.group.add(lbl);
+}
+attachShipLabel(zhouYuFlag, '★ Zhou Yu — Allied Flagship', 'sun');
+attachShipLabel(alliedShips[2], "★ Wu Squadron — Sun Quan's navy", 'sun');
+attachShipLabel(alliedShips[6], "★ Liu Bei's Flotilla", 'liu');
+attachShipLabel(chainedShips[8], "♔ Cao Cao's Chained Flagship", 'cao');
+
 /* ---------- Huang Gai's fire ships ---------- */
 const fireShips = [];
 class FireShip {
@@ -1359,7 +1388,7 @@ class FireShip {
     this.whiteFlag.material.opacity = 0;          // ruse dropped
     this.sailM.color.set(0x6a4a30);
   }
-  setVisible(v){ this.group.visible = v; }
+  setVisible(v){ setGroupVisible(this.group, v); }
   update(dt, t){
     if(this.moveT < 1){
       this.moveT = Math.min(1, this.moveT + dt / this.moveDur);
@@ -1748,8 +1777,13 @@ const ACTS = [
     setFires(['caoCamp1', 'caoCamp2']);
     U.caocao.setStatus('Ordering the remaining hulls burned');
     U.caoInf.setStatus('Routing — fire reaches the shore camp');
-    U.zhouyu.setStatus('Leading the assault upriver');
-    U.huanggai.setStatus('Squadron expended — attack delivered');
+    U.zhouyu.setVisible(false);                 // aboard the flagship, leading the attack
+    U.zhouyu.setStatus('Aboard the flagship — leading the assault');
+    U.sunquan.setStatus('At Chaisang — the fleet carries the battle');
+    U.huanggai.setStatus('Rejoining the fleet (Romance: wounded by his own ruse)');
+    U.huanggai.moveTo(390, 140, 9);
+    U.liubei.moveTo(120, 330, 14);  U.liubei.setStatus('Marching upstream to harry the retreat');
+    U.zhuge.moveTo(160, 360, 14);   U.zhuge.setStatus('Posting ambushes on the roads (Romance)');
     setBars(25, 95, 95, 70);
   },
   triggers: [
@@ -1800,15 +1834,17 @@ const ACTS = [
     U.caocao.placeAt(-420, -500); U.caocao.setStatus('Defeated — withdrawing north');
     U.caoInf.placeAt(-380, -470); U.caoInf.setStatus('Decimated by fire, rout & disease');
     U.sunquan.setStatus('Victorious — the Southland stands');
-    U.zhouyu.setStatus('Victorious commander');
-    U.huanggai.setStatus('The fire attack succeeded');
-    U.liubei.setStatus('Victorious — turns west to Jing & Shu');
-    U.zhuge.setStatus('The tripod of three kingdoms is set');
+    U.zhouyu.placeAt(190, 165);  U.zhouyu.setStatus('Victorious commander, ashore at the won anchorage');
+    U.huanggai.placeAt(390, 140); U.huanggai.setStatus('The fire attack succeeded');
+    U.liubei.placeAt(120, 330);  U.liubei.setStatus('Victorious — turns west to Jing & Shu');
+    U.zhuge.placeAt(160, 360);   U.zhuge.setStatus('The tripod of three kingdoms is set');
     setBars(5, 95, 25, 100);
   },
   triggers: [
     { at: 10, fn(){ victoryBanner.classList.add('visible'); } },
-    { at: 20, fn(){ document.getElementById('act-event').textContent =
+    { at: 15, fn(){ document.getElementById('act-event').textContent =
+        'On the Huarong road, Guan Yu lets the beaten Cao Cao pass (Romance dramatization)'; } },
+    { at: 21, fn(){ document.getElementById('act-event').textContent =
         'Wei in the north, Wu in the southeast, Shu in the west — the Three Kingdoms era begins'; } }
   ]
 }];
@@ -1854,6 +1890,7 @@ function restoreAlliedFleet(){
     s.reset();
     s.status = 'At anchor'; s.opts.info.status = 'At anchor';
   });
+  U.zhouyu.setVisible(true);     // back ashore unless an act puts him aboard
 }
 
 function setAct(i){
