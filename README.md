@@ -2,6 +2,8 @@
 
 **Live demo: https://yitachen.github.io/battle-of-alesia-3d/**
 
+![Act 2 — Caesar begins the siege: the Alesia oppidum ringed by Roman fortifications, with the documentary UI, six-act timeline and playback controls](docs/screenshot.png)
+
 An interactive 3D reconstruction of the Battle of Alesia (52 BCE), styled as a
 TV history special / war documentary / game battle-replay hybrid. Julius Caesar
 besieges Vercingetorix inside the hilltop oppidum of Alesia — then is himself
@@ -43,11 +45,12 @@ and unit labels.
 | Control | Action |
 |---|---|
 | Act buttons / ⏮ ⏭ | Jump between chapters |
-| ▶ / Space | Auto play / pause |
-| 🎬 / `C` | Toggle Cinematic ↔ Free camera |
+| ▶ ⏸ / Space | Pause / resume the entire show (progress, troops, effects, camera) |
+| 1× 2× 3× 4× / keys `1`–`4` | Playback speed |
+| 🎬 / `C` | Toggle Cinematic ↔ Free camera (free camera works even while paused) |
 | Mouse drag / wheel | Rotate / zoom (free camera) |
 | Click a unit or label | Show its info card |
-| `?act=N` URL param | Deep-link straight into act N |
+| `?act=N` / `?act=N&t=S` URL params | Deep-link straight into act N (optionally S seconds in) |
 
 ## Historical note
 

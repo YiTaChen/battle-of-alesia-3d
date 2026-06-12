@@ -88,6 +88,21 @@
     color:#e8e6e0;font-size:12px;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all .2s;}
   .ctl-btn:hover{background:rgba(255,255,255,0.18);}
   .ctl-btn.toggled{background:rgba(216,178,92,0.25);border-color:var(--gold);color:#ffe9bb;}
+  .speed-group{display:flex;gap:3px;}
+  .speed-btn{padding:6px 8px;font-size:11px;}
+
+  /* victory banner (end of Act 6) */
+  #victory-banner{position:fixed;left:50%;top:24%;transform:translate(-50%,-50%) scale(0.92);
+    z-index:30;text-align:center;background:rgba(10,12,18,0.88);border:2px solid var(--gold);
+    border-radius:10px;padding:22px 46px;opacity:0;pointer-events:none;
+    transition:opacity 1.4s ease, transform 1.4s ease;backdrop-filter:blur(8px);
+    box-shadow:0 0 60px rgba(216,178,92,0.25);}
+  #victory-banner.visible{opacity:1;transform:translate(-50%,-50%) scale(1);}
+  #victory-banner .laurel{font-size:30px;}
+  #victory-banner h2{font-family:Georgia,serif;font-size:30px;letter-spacing:5px;
+    color:var(--gold);text-transform:uppercase;margin:6px 0 4px;}
+  #victory-banner p{font-size:13px;color:#cfc9bd;letter-spacing:1px;}
+  #victory-banner .sub{font-size:11px;color:#8d887c;margin-top:6px;}
   #act-progress{flex:1;height:5px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;max-width:240px;}
   #act-progress-fill{height:100%;width:0%;background:var(--gold);transition:width .3s linear;}
 
@@ -198,9 +213,23 @@
     <button class="ctl-btn" id="btn-prev" title="Previous act">⏮ Prev</button>
     <button class="ctl-btn" id="btn-play" title="Auto play">▶ Auto Play</button>
     <button class="ctl-btn" id="btn-next" title="Next act">Next ⏭</button>
+    <div class="speed-group" title="Playback speed">
+      <button class="ctl-btn speed-btn" data-speed="1">1×</button>
+      <button class="ctl-btn speed-btn" data-speed="2">2×</button>
+      <button class="ctl-btn speed-btn" data-speed="3">3×</button>
+      <button class="ctl-btn speed-btn" data-speed="4">4×</button>
+    </div>
     <div id="act-progress"><div id="act-progress-fill"></div></div>
     <button class="ctl-btn toggled" id="btn-camera" title="Toggle camera mode">🎬 Cinematic Camera</button>
   </div>
+</div>
+
+<!-- ==================== VICTORY BANNER ==================== -->
+<div id="victory-banner">
+  <div class="laurel">🏛 ⚔ 🏛</div>
+  <h2>Roman Victory</h2>
+  <p>Vercingetorix surrenders to Julius Caesar</p>
+  <div class="sub">The Gallic revolt is broken — Gaul becomes a Roman province</div>
 </div>
 
 <!-- ==================== INFO CARD ==================== -->
@@ -288,6 +317,13 @@ function setMood(skyHex, sunHex, sunI, hemiI){
 
 const updateHooks = [];   // every dynamic system registers an update(dt, t) here
 const clock = new THREE.Clock();
+
+/* simulation clock: pause freezes EVERYTHING (progress, troops, effects,
+   cinematic camera); speed scales the whole show (1x–4x). The free camera
+   itself stays interactive while paused. */
+let playing = true;
+let simSpeed = 1;
+let simT = 0;
 
 /* =====================================================================
    SECTION 2 : TERRAIN
@@ -895,6 +931,43 @@ U.reliefMain.setVisible(false); U.reliefMain.placeAt(-620, 40);
 U.reliefCav.setVisible(false);  U.reliefCav.placeAt(-600, -120);
 U.reliefElite.setVisible(false); U.reliefElite.placeAt(-640, -220);
 
+/* white surrender flag — raised by Vercingetorix at the end (Act 6) */
+const surrenderFlag = (() => {
+  const g = new THREE.Group();
+  const poleH = 32;
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.4, 0.5, poleH, 6),
+    new THREE.MeshStandardMaterial({ color:0x4a3a26, roughness:0.9 }));
+  pole.position.y = poleH / 2;
+  const flagGeo = new THREE.PlaneGeometry(13, 9, 8, 4);
+  const flag = new THREE.Mesh(flagGeo, new THREE.MeshStandardMaterial({
+    color:0xf5f2e8, emissive:0x555048, side:THREE.DoubleSide, roughness:0.8 }));
+  flag.position.set(7, poleH - 5, 0);
+  g.add(pole, flag);
+  const div = document.createElement('div');
+  div.className = 'unit-label';
+  div.style.borderColor = '#f5f2e8'; div.style.color = '#fff';
+  div.textContent = '⚐ SURRENDER';
+  const lbl = new CSS2DObject(div);
+  lbl.position.set(0, poleH + 6, 0);
+  g.add(lbl);
+  const pos = flagGeo.attributes.position;
+  const base = pos.array.slice();
+  updateHooks.push((dt, t) => {
+    if(!g.visible) return;
+    for(let i = 0; i < pos.count; i++){
+      const x0 = base[i*3], y0 = base[i*3+1];
+      pos.setZ(i, Math.sin(x0 * 0.5 + t * 3.5) * 0.7 * ((x0 + 6.5) / 13));
+      pos.setY(i, y0 + Math.sin(x0 * 0.4 + t * 2.6) * 0.2);
+    }
+    pos.needsUpdate = true;
+  });
+  g.visible = false;
+  U.verc.group.add(g);
+  return g;
+})();
+const victoryBanner = document.getElementById('victory-banner');
+
 /* ---------- info card ---------- */
 const infoCard = document.getElementById('info-card');
 function showInfoCard(unit, ev){
@@ -1200,6 +1273,8 @@ function stopAllEffects(){
   ballistae.stop();
   Object.values(assaultArrows).forEach(a => a.visible = false);
   setFires([]); setDust([]);
+  surrenderFlag.visible = false;
+  victoryBanner.classList.remove('visible');
 }
 
 /* =====================================================================
@@ -1419,7 +1494,13 @@ const ACTS = [
     setBars(88, 8, 2, 100);
   },
   triggers: [
-    { at: 8, fn(){ U.verc.moveTo(270, 235, 14); } },
+    { at: 8, fn(){
+        U.verc.moveTo(270, 235, 14);
+        surrenderFlag.visible = true;            // the white flag goes up
+        document.getElementById('act-event').textContent =
+          'Vercingetorix rides out under a white flag to Caesar\'s camp';
+      } },
+    { at: 18, fn(){ victoryBanner.classList.add('visible'); } },
     { at: 22, fn(){ U.verc.setStatus('Prisoner of Rome'); setDust([]); } }
   ]
 }];
@@ -1429,7 +1510,6 @@ const ACTS = [
    ===================================================================== */
 let actIndex = -1;
 let actT = 0;
-let autoPlay = true;
 let camMode = 'cinematic';
 let firedTriggers = new Set();
 let camCurvePos = null, camCurveLook = null, camPathDur = 1;
@@ -1479,11 +1559,18 @@ function setAct(i){
 /* transport buttons */
 const btnPlay = document.getElementById('btn-play');
 const btnCam  = document.getElementById('btn-camera');
-function setAutoPlay(v){
-  autoPlay = v;
-  btnPlay.textContent = v ? '⏸ Pause' : '▶ Auto Play';
+function setPlaying(v){
+  playing = v;
+  btnPlay.textContent = v ? '⏸ Pause' : '▶ Play';
   btnPlay.classList.toggle('toggled', v);
 }
+function setSpeed(s){
+  simSpeed = s;
+  document.querySelectorAll('.speed-btn').forEach(b =>
+    b.classList.toggle('toggled', parseInt(b.dataset.speed, 10) === s));
+}
+document.querySelectorAll('.speed-btn').forEach(b =>
+  b.addEventListener('click', () => setSpeed(parseInt(b.dataset.speed, 10))));
 function setCamMode(m){
   camMode = m;
   const cine = m === 'cinematic';
@@ -1492,15 +1579,16 @@ function setCamMode(m){
   document.body.classList.toggle('cinematic', cine);
   controls.enabled = !cine;
 }
-btnPlay.addEventListener('click', () => setAutoPlay(!autoPlay));
+btnPlay.addEventListener('click', () => setPlaying(!playing));
 btnCam.addEventListener('click', () => setCamMode(camMode === 'cinematic' ? 'free' : 'cinematic'));
 document.getElementById('btn-prev').addEventListener('click', () => setAct(actIndex - 1));
 document.getElementById('btn-next').addEventListener('click', () => setAct(actIndex + 1));
 addEventListener('keydown', (e) => {
-  if(e.key === ' '){ e.preventDefault(); setAutoPlay(!autoPlay); }
+  if(e.key === ' '){ e.preventDefault(); setPlaying(!playing); }
   if(e.key === 'ArrowRight') setAct(actIndex + 1);
   if(e.key === 'ArrowLeft') setAct(actIndex - 1);
   if(e.key.toLowerCase() === 'c') setCamMode(camMode === 'cinematic' ? 'free' : 'cinematic');
+  if(['1','2','3','4'].includes(e.key)) setSpeed(parseInt(e.key, 10));
 });
 
 /* playback + camera director */
@@ -1509,14 +1597,14 @@ const camLookNow = new THREE.Vector3(0, 30, 0);
 updateHooks.push((dt) => {
   if(actIndex < 0) return;
   const act = ACTS[actIndex];
-  if(autoPlay || actT < camPathDur) actT += dt;
+  actT += dt;                       // dt is 0 while paused — everything freezes
   // mid-act triggers
   for(let k = 0; k < (act.triggers?.length ?? 0); k++){
     const tr = act.triggers[k];
     if(actT >= tr.at && !firedTriggers.has(k)){ firedTriggers.add(k); tr.fn(); }
   }
   elProgress.style.width = Math.min(100, actT / act.duration * 100) + '%';
-  if(autoPlay && actT >= act.duration) setAct(actIndex + 1);
+  if(actT >= act.duration) setAct(actIndex + 1);   // auto-advance when playing
   // cinematic camera
   if(camMode === 'cinematic'){
     const k = Math.min(1, actT / camPathDur);  // catmull-rom supplies the smoothing
@@ -1530,12 +1618,16 @@ updateHooks.push((dt) => {
 
 /* boot: start the show (?act=N deep-links into a chapter) */
 setCamMode('cinematic');
-setAutoPlay(true);
-const actParam = parseInt(new URLSearchParams(location.search).get('act'), 10);
+setPlaying(true);
+setSpeed(1);
+const bootParams = new URLSearchParams(location.search);
+const actParam = parseInt(bootParams.get('act'), 10);
 if(actParam >= 1 && actParam <= ACTS.length){
   setAct(actParam - 1);
   finishLinesInstantly();       // deep links skip the construction animation
-  camera.position.copy(camCurvePos.getPoint(0));   // start on the act's camera path
+  const tParam = parseFloat(bootParams.get('t'));
+  if(tParam > 0) actT = Math.min(tParam, ACTS[actIndex].duration - 0.5); // jump mid-act
+  camera.position.copy(camCurvePos.getPoint(Math.min(1, actT / camPathDur)));
 } else {
   setAct(0);
 }
@@ -1545,8 +1637,10 @@ if(actParam >= 1 && actParam <= ACTS.length){
    ===================================================================== */
 function animate(){
   requestAnimationFrame(animate);
-  const dt = Math.min(clock.getDelta(), 0.05);
-  const t = clock.elapsedTime;
+  const rawDt = Math.min(clock.getDelta(), 0.05);
+  const dt = playing ? rawDt * simSpeed : 0;   // frozen while paused
+  simT += dt;
+  const t = simT;
 
   // smooth lighting transitions
   lighting.sky.lerp(lighting.targetSky, dt*1.2);
